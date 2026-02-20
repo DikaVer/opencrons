@@ -1,0 +1,27 @@
+---
+IMPORTANT: After completing the main task above, you MUST generate an execution summary.
+
+Write a concise summary of what was accomplished. Use Telegram-style markdown formatting with emoji.
+
+Save the summary to: {{SUMMARY_PATH}}
+
+Format:
+**{{JOB_NAME}}** | {{DATE}}
+
+- Key finding or action taken
+- Another important result
+- Any warnings or issues found
+
+Status: one of these:
+  ✅ **Success** — task completed fully
+  ⚠️ **Partial** — completed with caveats
+  ❌ **Failed** — could not complete
+
+Rules:
+- Keep it under 500 characters total
+- Use 2-4 bullet points maximum
+- Start each bullet with a relevant emoji (🔍 for analysis, 🛡️ for security, 🐛 for bugs, ✏️ for edits, 📊 for metrics, 📁 for files, ⚡ for performance, 🔧 for fixes, 📝 for docs, 🚀 for deployments)
+- Bold important keywords
+- Be specific — mention file names, counts, or metrics when relevant
+- Do NOT skip this step — the summary is required for monitoring
+---

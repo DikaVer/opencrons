@@ -1,0 +1,83 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+
+	"github.com/dika-maulidal/cli-scheduler/internal/config"
+	"github.com/dika-maulidal/cli-scheduler/internal/executor"
+	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/spf13/cobra"
+)
+
+var runCmd = &cobra.Command{
+	Use:   "run <name>",
+	Short: "Execute a job immediately",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runRun,
+}
+
+func init() {
+	rootCmd.AddCommand(runCmd)
+}
+
+func runRun(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	if err := platform.EnsureDirs(); err != nil {
+		return fmt.Errorf("creating directories: %w", err)
+	}
+
+	job, err := config.FindJobByName(platform.SchedulesDir(), name)
+	if err != nil {
+		return err
+	}
+
+	// Validate prompt file exists
+	if err := job.ValidatePromptFileExists(platform.PromptsDir()); err != nil {
+		return err
+	}
+
+	db, err := storage.Open(platform.DBPath())
+	if err != nil {
+		return fmt.Errorf("opening database: %w", err)
+	}
+	defer db.Close()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	fmt.Printf("Running job %q...\n", name)
+
+	result, err := executor.Run(ctx, db, job, "manual")
+	if err != nil {
+		return fmt.Errorf("execution failed: %w", err)
+	}
+
+	fmt.Printf("\nStatus:   %s\n", result.Status)
+	fmt.Printf("Duration: %s\n", result.Duration.Round(1e9))
+	fmt.Printf("Exit:     %d\n", result.ExitCode)
+	if result.CostUSD > 0 {
+		fmt.Printf("Cost:     $%.4f\n", result.CostUSD)
+	}
+	if result.InputTokens > 0 || result.OutputTokens > 0 {
+		fmt.Printf("Tokens:   %d in / %d out / %d cache read / %d cache write\n",
+			result.InputTokens, result.OutputTokens,
+			result.CacheReadTokens, result.CacheCreationTokens)
+	}
+	if result.StdoutPath != "" {
+		fmt.Printf("Output:   %s\n", result.StdoutPath)
+	}
+	if result.ErrorMsg != "" {
+		fmt.Printf("Error:    %s\n", result.ErrorMsg)
+	}
+
+	if result.Status != "success" {
+		os.Exit(1)
+	}
+
+	return nil
+}
