@@ -41,7 +41,7 @@ func runDebug(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("saving settings: %w", err)
 		}
 		fmt.Printf("  Debug logging: %s\n", ui.Success.Render("on"))
-		fmt.Printf("  Logs: %s\n", ui.Dim.Render(platform.LogsDir()+"/opencrons-debug.log"))
+		fmt.Printf("  Logs: %s\n", ui.Dim.Render(platform.LogsDir()+"/opencrons.log"))
 	case "off":
 		if err := platform.SetDebug(false); err != nil {
 			return fmt.Errorf("saving settings: %w", err)

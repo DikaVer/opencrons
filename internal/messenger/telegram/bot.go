@@ -23,6 +23,8 @@ import (
 	"github.com/DikaVer/opencrons/internal/storage"
 )
 
+var slogger = logger.New("telegram")
+
 // Bot wraps the Telegram bot with OpenCron integration.
 type Bot struct {
 	bot      *bot.Bot
@@ -58,7 +60,7 @@ func New(db *storage.DB, settings *platform.MessengerSettings, stdlog *log.Logge
 		bot.WithDefaultHandler(b.handleDefault),
 		bot.WithErrorsHandler(func(err error) {
 			stdlog.Printf("[telegram] error: %v", err)
-			logger.Debug("Telegram bot error: %v", err)
+			slogger.Warn("bot poll error", "err", err)
 		}),
 	}
 
@@ -81,7 +83,7 @@ func (b *Bot) Start(ctx context.Context) {
 	b.setCommands(ctx)
 
 	b.stdlog.Println("[telegram] Bot started")
-	logger.Info("Telegram bot started")
+	slogger.Info("bot started")
 
 	b.bot.Start(ctx)
 }
@@ -101,7 +103,7 @@ func (b *Bot) setCommands(ctx context.Context) {
 	})
 	if err != nil {
 		b.stdlog.Printf("[telegram] Failed to set commands: %v", err)
-		logger.Debug("SetMyCommands error: %v", err)
+		slogger.Warn("SetMyCommands error", "err", err)
 	}
 }
 
@@ -111,7 +113,7 @@ func (b *Bot) Stop() {
 		b.cancel()
 	}
 	b.stdlog.Println("[telegram] Bot stopped")
-	logger.Info("Telegram bot stopped")
+	slogger.Info("bot stopped")
 }
 
 // Send sends a text message to the given chat with HTML formatting.
@@ -173,6 +175,7 @@ func (b *Bot) handleDefault(ctx context.Context, tgBot *bot.Bot, update *models.
 
 	// Authorization check
 	if !b.IsAuthorized(userID) {
+		slogger.Info("unauthorized access attempt", "userID", userID)
 		b.SendPlain(ctx, chatID, "You are not authorized to use this bot.")
 		return
 	}

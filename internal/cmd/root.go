@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/DikaVer/opencrons/internal/platform"
 	"github.com/DikaVer/opencrons/internal/tui"
 	"github.com/spf13/cobra"
@@ -19,6 +20,8 @@ var rootCmd = &cobra.Command{
 	Short: "OpenCron — Claude Code automation scheduler",
 	Long:  "OpenCron runs Claude Code tasks on cron schedules with secure, predefined execution environments.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		logger.Init(platform.LogsDir(), platform.IsDebugEnabled())
+
 		// Skip setup check for these commands
 		name := cmd.Name()
 		if name == "setup" || name == "help" || name == "version" {

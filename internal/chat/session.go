@@ -17,6 +17,8 @@ import (
 	"github.com/DikaVer/opencrons/internal/storage"
 )
 
+// log is defined in runner.go via logger.New("chat")
+
 // SessionManager manages chat sessions for users.
 type SessionManager struct {
 	db *storage.DB
@@ -38,6 +40,7 @@ func (sm *SessionManager) GetOrCreateSession(userID, chatID int64) (*storage.Cha
 	if session != nil {
 		// Touch the session to update last activity
 		_ = sm.db.TouchSession(session.ID)
+		log.Debug("existing session found", "sessionID", session.ID, "userID", userID)
 		return session, false, nil
 	}
 
@@ -73,10 +76,12 @@ func (sm *SessionManager) CreateSession(userID, chatID int64) (*storage.ChatSess
 		return nil, fmt.Errorf("creating session: %w", err)
 	}
 
+	log.Info("session created", "sessionID", session.ID, "userID", userID, "model", session.Model, "effort", session.Effort)
 	return session, nil
 }
 
 // ClearSession deactivates the active session for a user.
 func (sm *SessionManager) ClearSession(userID int64) error {
+	log.Info("session cleared", "userID", userID)
 	return sm.db.DeactivateUserSessions(userID)
 }

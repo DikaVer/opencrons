@@ -18,7 +18,6 @@ import (
 	"github.com/go-telegram/bot/models"
 
 	"github.com/DikaVer/opencrons/internal/chat"
-	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/DikaVer/opencrons/internal/ui"
 )
 
@@ -51,7 +50,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	session, isNew, err := b.sessionMgr.GetOrCreateSession(userID, chatID)
 	if err != nil {
 		b.SendPlain(ctx, chatID, fmt.Sprintf("Error creating session: %v", err))
-		logger.Debug("Session error for user %d: %v", userID, err)
+		slogger.Warn("session error", "userID", userID, "err", err)
 		return
 	}
 
@@ -74,7 +73,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	// If --resume fails because Claude has no transcript on disk (e.g. the
 	// first call in this session errored), fall back to a fresh session.
 	if err != nil && !isNew && strings.Contains(err.Error(), "No conversation found") {
-		logger.Debug("No Claude transcript for session %s, creating fresh session for user %d", session.ID, userID)
+		slogger.Debug("no Claude transcript, creating fresh session", "sessionID", session.ID, "userID", userID)
 		_ = b.sessionMgr.ClearSession(userID)
 		if newSession, sessErr := b.sessionMgr.CreateSession(userID, chatID); sessErr == nil {
 			session = newSession
@@ -89,7 +88,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	// If session lock is stale ("already in use"), wait briefly and retry
 	// to preserve conversation history before falling back to a new session.
 	if err != nil && strings.Contains(err.Error(), "already in use") {
-		logger.Debug("Session %s in use for user %d, retrying after delay", session.ID, userID)
+		slogger.Debug("session in use, retrying after delay", "sessionID", session.ID, "userID", userID)
 
 		select {
 		case <-runCtx.Done():
@@ -102,7 +101,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		// Still failing — create a fresh session as last resort
 		if err != nil && strings.Contains(err.Error(), "already in use") {
-			logger.Debug("Retry failed, creating fresh session for user %d", userID)
+			slogger.Debug("retry failed, creating fresh session", "userID", userID)
 			_ = b.sessionMgr.ClearSession(userID)
 			if newSession, sessErr := b.sessionMgr.CreateSession(userID, chatID); sessErr == nil {
 				session = newSession
@@ -118,13 +117,19 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	if err != nil {
 		errMsg := fmt.Sprintf("Error: %v\nTry /new for a fresh session.", err)
 		b.SendPlain(ctx, chatID, errMsg)
-		logger.Debug("Chat runner error for user %d: %v", userID, err)
+		slogger.Warn("chat runner error", "userID", userID, "err", err)
 		return
 	}
 
+	slogger.Info("chat response delivered", "userID", userID, "cost", result.CostUSD, "duration", result.Duration)
+
 	// Log to database (for visibility only)
-	_ = b.db.AddChatLog(session.ID, "user", text, 0, 0)
-	_ = b.db.AddChatLog(session.ID, "assistant", result.Response, result.CostUSD, result.Tokens)
+	if err := b.db.AddChatLog(session.ID, "user", text, 0, 0); err != nil {
+		slogger.Warn("chat log write failed", "sessionID", session.ID, "role", "user", "err", err)
+	}
+	if err := b.db.AddChatLog(session.ID, "assistant", result.Response, result.CostUSD, result.Tokens); err != nil {
+		slogger.Warn("chat log write failed", "sessionID", session.ID, "role", "assistant", "err", err)
+	}
 
 	// Send response to Telegram
 	// Try markdown first, fall back to plain text if it fails

@@ -11,12 +11,15 @@ import (
 	"strings"
 
 	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/DikaVer/opencrons/internal/platform"
 	"github.com/DikaVer/opencrons/internal/tui"
 	"github.com/DikaVer/opencrons/internal/ui"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
+
+var cmdlog = logger.New("cmd")
 
 // Package-level typed flag values for non-interactive mode.
 var (
@@ -108,6 +111,7 @@ func runAddInteractive() error {
 		return fmt.Errorf("saving job config: %w", err)
 	}
 
+	cmdlog.Info("job created", "name", result.Job.Name, "schedule", result.Job.Schedule)
 	fmt.Printf("\nJob %q created successfully!\n", result.Job.Name)
 	fmt.Printf("  Config:   %s\n", filepath.Join(platform.SchedulesDir(), result.Job.Name+".yml"))
 	fmt.Printf("  Prompt:   %s\n", filepath.Join(platform.PromptsDir(), result.Job.PromptFile))
@@ -188,6 +192,8 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	if err := config.SaveJob(platform.SchedulesDir(), job); err != nil {
 		return fmt.Errorf("saving job config: %w", err)
 	}
+
+	cmdlog.Info("job created", "name", name, "schedule", schedule, "model", model)
 
 	// Print detailed creation summary
 	fmt.Printf("Job %q created successfully.\n", name)

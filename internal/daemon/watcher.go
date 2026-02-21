@@ -6,7 +6,6 @@
 package daemon
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -68,7 +67,7 @@ func (w *Watcher) Start() {
 			if !ok {
 				return
 			}
-			log.Printf("Watcher error: %v", err)
+			slogger.Warn("watcher error", "err", err)
 
 		case <-w.done:
 			return

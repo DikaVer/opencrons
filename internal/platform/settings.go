@@ -13,10 +13,15 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/DikaVer/opencrons/internal/logger"
 )
 
-var debugFlag atomic.Bool
-var debugLoaded atomic.Bool
+var (
+	debugFlag   atomic.Bool
+	debugLoaded atomic.Bool
+	plog        = logger.New("platform")
+)
 
 // Settings holds persisted application settings.
 type Settings struct {
@@ -82,6 +87,7 @@ func SaveSettings(s Settings) error {
 	// Keep in-memory debug cache in sync with persisted settings.
 	debugFlag.Store(s.Debug)
 	debugLoaded.Store(true)
+	plog.Info("settings saved")
 	return nil
 }
 
@@ -107,6 +113,8 @@ func SetDebug(enabled bool) error {
 
 	debugFlag.Store(enabled)
 	debugLoaded.Store(true)
+	logger.SetDebug(enabled)
+	plog.Info("debug toggled", "enabled", enabled)
 	return nil
 }
 

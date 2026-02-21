@@ -38,24 +38,30 @@ type Daemon struct {
 	tgBot   atomic.Pointer[telegram.Bot] // written once at startup, read from cron goroutines
 }
 
+var slogger = logger.New("daemon")
+
 // cronLogger routes cron library messages to OpenCron logging.
 type cronLogger struct {
 	stdlog *log.Logger
 }
 
 func (l *cronLogger) Info(msg string, keysAndValues ...interface{}) {
-	logger.Debug("cron info: msg=%s fields=%v", msg, keysAndValues)
+	args := append([]any{"msg", msg}, keysAndValues...)
+	slogger.Debug("cron info", args...)
 }
 
 func (l *cronLogger) Error(err error, msg string, keysAndValues ...interface{}) {
 	if l.stdlog != nil {
 		l.stdlog.Printf("Cron error: %s: %v (fields=%v)", msg, err, keysAndValues)
 	}
-	logger.Debug("cron error: msg=%s err=%v fields=%v", msg, err, keysAndValues)
+	args := append([]any{"msg", msg, "err", err}, keysAndValues...)
+	slogger.Warn("cron error", args...)
 }
 
 // Run starts the daemon in the foreground.
 func Run() error {
+	logger.Init(platform.LogsDir(), platform.IsDebugEnabled())
+
 	stdlog := log.New(os.Stdout, "[opencrons] ", log.LstdFlags)
 	cronLog := &cronLogger{stdlog: stdlog}
 
@@ -94,7 +100,7 @@ func Run() error {
 	if msgCfg != nil && msgCfg.Type == "telegram" {
 		if err := d.startTelegramBot(db, msgCfg, stdlog); err != nil {
 			stdlog.Printf("Warning: Telegram bot failed to start: %v", err)
-			logger.Debug("Telegram bot start error: %v", err)
+			slogger.Warn("telegram bot start error", "err", err)
 		}
 	}
 
@@ -111,12 +117,13 @@ func Run() error {
 		d.watcher = watcher
 		go watcher.Start()
 		defer watcher.Stop()
+		slogger.Info("file watcher started", "dir", platform.SchedulesDir())
 	}
 
 	// Start cron
 	d.cron.Start()
 	d.logger.Printf("Daemon started (PID %d), %d job(s) loaded", os.Getpid(), len(d.jobs))
-	logger.Info("Daemon started (PID %d), %d job(s) loaded", os.Getpid(), len(d.jobs))
+	slogger.Info("daemon started", "pid", os.Getpid(), "jobs", len(d.jobs))
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
@@ -124,7 +131,7 @@ func Run() error {
 	sig := <-sigCh
 
 	d.logger.Printf("Received %s, shutting down...", sig)
-	logger.Info("Received %s, shutting down...", sig)
+	slogger.Info("shutdown signal received", "signal", sig)
 
 	// Stop Telegram bot first
 	if bot := d.tgBot.Load(); bot != nil {
@@ -134,7 +141,7 @@ func Run() error {
 	ctx := d.cron.Stop()
 	<-ctx.Done()
 	d.logger.Println("Daemon stopped.")
-	logger.Info("Daemon stopped")
+	slogger.Info("daemon stopped")
 
 	return nil
 }
@@ -169,11 +176,13 @@ func (d *Daemon) loadJobs() error {
 	for _, job := range jobs {
 		if !job.Enabled {
 			d.logger.Printf("Skipping disabled job %q", job.Name)
+			slogger.Info("skipping disabled job", "name", job.Name)
 			continue
 		}
 
 		if err := d.registerJob(job); err != nil {
 			d.logger.Printf("Failed to register job %q: %v", job.Name, err)
+			slogger.Error("failed to register job", "name", job.Name, "err", err)
 		}
 	}
 
@@ -198,16 +207,17 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 
 	entryID, err := d.cron.AddFunc(j.Schedule, func() {
 		d.logger.Printf("Executing job %q", j.Name)
-		logger.Debug("Daemon executing job %q", j.Name)
+		slogger.Info("executing job", "name", j.Name)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		result, err := executor.Run(ctx, d.db, j, "scheduled")
 		if err != nil {
 			d.logger.Printf("Job %q execution error: %v", j.Name, err)
-			logger.Debug("Daemon job %q error: %v", j.Name, err)
+			slogger.Error("job execution error", "name", j.Name, "err", err)
 			return
 		}
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
+		slogger.Info("job completed", "name", j.Name, "status", result.Status, "duration", result.Duration)
 
 		// Notify via Telegram if bot is running
 		if bot := d.tgBot.Load(); bot != nil {
@@ -220,13 +230,14 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 
 	d.jobs[j.Name] = entryID
 	d.logger.Printf("Registered job %q (%s)", j.Name, j.Schedule)
+	slogger.Info("registered job", "name", j.Name, "schedule", j.Schedule)
 	return nil
 }
 
 // Reload reloads all job configurations.
 func (d *Daemon) Reload() {
 	d.logger.Println("Reloading job configurations...")
-	logger.Debug("Hot-reload triggered")
+	slogger.Info("hot-reload triggered")
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -241,19 +252,22 @@ func (d *Daemon) Reload() {
 	jobs, err := config.LoadAllJobs(platform.SchedulesDir())
 	if err != nil {
 		d.logger.Printf("Error reloading jobs: %v", err)
+		slogger.Error("reload error", "err", err)
 		return
 	}
 
 	for _, job := range jobs {
 		if !job.Enabled {
 			d.logger.Printf("Skipping disabled job %q", job.Name)
+			slogger.Info("skipping disabled job", "name", job.Name)
 			continue
 		}
 		if err := d.registerJobLocked(job); err != nil {
 			d.logger.Printf("Failed to register job %q: %v", job.Name, err)
+			slogger.Error("failed to register job", "name", job.Name, "err", err)
 		}
 	}
 
 	d.logger.Printf("Reload complete: %d job(s) loaded", len(d.jobs))
-	logger.Debug("Hot-reload complete: %d job(s) loaded", len(d.jobs))
+	slogger.Info("hot-reload complete", "jobs", len(d.jobs))
 }

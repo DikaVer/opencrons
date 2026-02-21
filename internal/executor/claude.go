@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/DikaVer/opencrons/internal/config"
-	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/DikaVer/opencrons/internal/platform"
 )
 
@@ -68,6 +67,7 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 
 	// Read prompt from file
 	promptPath := filepath.Join(platform.PromptsDir(), job.PromptFile)
+	log.Debug("reading prompt file", "path", promptPath)
 	promptContent, err := os.ReadFile(promptPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading prompt file %s: %w", promptPath, err)
@@ -88,6 +88,7 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 			"{{DATE}}", now.Format("2006-01-02 15:04"),
 		).Replace(summaryPromptTemplate)
 		prompt += injection
+		log.Debug("summary injection applied", "job", job.Name, "summaryPath", summaryPath)
 	}
 
 	// Pass prompt via stdin to avoid exposing it in process list
@@ -96,7 +97,7 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Dir = job.WorkingDir
 
-	logger.Debug("Built command: claude %s (dir=%s)", strings.Join(args, " "), job.WorkingDir)
+	log.Debug("built command", "args", strings.Join(args, " "), "dir", job.WorkingDir)
 
 	return &BuildResult{Cmd: cmd, SummaryPath: summaryPath}, nil
 }

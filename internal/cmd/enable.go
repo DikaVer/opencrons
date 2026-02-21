@@ -50,6 +50,7 @@ func enableJob(name string) error {
 		return fmt.Errorf("saving job config: %w", err)
 	}
 
+	cmdlog.Info("job enabled", "name", name)
 	fmt.Printf("Job %q enabled. It will run on schedule.\n", name)
 	return nil
 }

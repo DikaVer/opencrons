@@ -63,6 +63,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("removing job: %w", err)
 	}
 
+	cmdlog.Info("job removed", "name", name)
 	fmt.Printf("Job %q removed.\n", name)
 	return nil
 }

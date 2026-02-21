@@ -7,15 +7,17 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
+
+var log = logger.New("config")
 
 // normalizeWorkingDir fixes bare Windows drive letters ("D:" → "D:\").
 // On Windows, "D:" means "current directory on drive D", not the drive root.
@@ -42,11 +44,13 @@ func LoadJob(path string) (*JobConfig, error) {
 
 	job.WorkingDir = normalizeWorkingDir(job.WorkingDir)
 
+	log.Info("job config loaded", "name", job.Name, "path", path)
 	return &job, nil
 }
 
 // LoadAllJobs reads all YAML files in the schedules directory.
 func LoadAllJobs(schedulesDir string) ([]*JobConfig, error) {
+	log.Debug("loading all jobs", "dir", schedulesDir)
 	entries, err := os.ReadDir(schedulesDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -67,7 +71,7 @@ func LoadAllJobs(schedulesDir string) ([]*JobConfig, error) {
 
 		job, err := LoadJob(filepath.Join(schedulesDir, name))
 		if err != nil {
-			log.Printf("Warning: skipping %s: %v", name, err)
+			log.Warn("skipping malformed config", "file", name, "err", err)
 			continue
 		}
 		jobs = append(jobs, job)
@@ -98,6 +102,7 @@ func SaveJob(schedulesDir string, job *JobConfig) error {
 		return fmt.Errorf("writing job config: %w", err)
 	}
 
+	log.Info("job config saved", "name", job.Name, "path", path)
 	return nil
 }
 
@@ -112,6 +117,7 @@ func SavePromptFile(promptsDir, filename, content string) error {
 		return fmt.Errorf("writing prompt file: %w", err)
 	}
 
+	log.Info("prompt file saved", "file", filename)
 	return nil
 }
 
@@ -157,6 +163,7 @@ func DeleteJob(schedulesDir, promptsDir, jobName string, deletePrompt bool) erro
 		}
 	}
 
+	log.Info("job deleted", "name", jobName)
 	return nil
 }
 

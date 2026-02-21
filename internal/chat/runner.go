@@ -23,6 +23,8 @@ import (
 	"github.com/DikaVer/opencrons/internal/storage"
 )
 
+var log = logger.New("chat")
+
 // chatOutput represents the JSON output from claude -p --output-format json.
 type chatOutput struct {
 	Result       string  `json:"result"`
@@ -81,7 +83,7 @@ func (r *Runner) Run(ctx context.Context, session *storage.ChatSession, message 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	logger.Debug("Chat runner: claude %s (dir=%s)", strings.Join(args, " "), session.WorkingDir)
+	log.Debug("chat runner: executing", "args", strings.Join(args, " "), "dir", session.WorkingDir)
 
 	startTime := time.Now()
 	err := cmd.Run()

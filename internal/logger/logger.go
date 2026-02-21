@@ -1,61 +1,77 @@
-// logger.go provides a singleton debug logger gated by platform.IsDebugEnabled.
-// Initialization is deferred via sync.Once so the logger is only created on
-// first use. When debug is enabled, log output is written to
-// logs/opencrons-debug.log inside the platform config directory; if the log
-// file cannot be opened, it falls back to stderr. The exported Debug and Info
-// functions are no-ops when debug logging is disabled, keeping overhead to zero
-// in production.
+// Package logger provides structured logging via log/slog.
+//
+// The logger is a leaf package with no internal dependencies. Call Init once
+// at startup to open the log file and set the initial level. Use New to
+// obtain a per-component *slog.Logger. Info/Warn/Error are always written
+// to file; Debug is gated by SetDebug. The underlying slog.LevelVar allows
+// atomic, lock-free level toggling at runtime.
 package logger
 
 import (
-	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/DikaVer/opencrons/internal/platform"
 )
 
 var (
-	instance *log.Logger
-	once     sync.Once
-	logFile  *os.File
+	level   slog.LevelVar // default Info; toggled to Debug via SetDebug
+	handler slog.Handler
+	logFile *os.File
+	once    sync.Once
 )
 
-// init initializes the logger lazily on first use.
-func get() *log.Logger {
+// Init opens the log file in logDir and configures the global slog handler.
+// It is safe to call multiple times — only the first call takes effect.
+// When debug is true, the minimum level is set to Debug; otherwise Info.
+func Init(logDir string, debug bool) {
 	once.Do(func() {
-		logsDir := platform.LogsDir()
-		_ = os.MkdirAll(logsDir, 0755)
+		_ = os.MkdirAll(logDir, 0755)
 
-		path := filepath.Join(logsDir, "opencrons-debug.log")
+		path := filepath.Join(logDir, "opencrons.log")
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			// Fall back to stderr if we can't open the log file.
-			instance = log.New(os.Stderr, "[opencrons] ", log.LstdFlags)
+			handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &level})
+			setLevel(debug)
+			slog.SetDefault(slog.New(handler))
 			return
 		}
 
 		logFile = f
-		instance = log.New(f, "[opencrons] ", log.LstdFlags)
+		handler = slog.NewTextHandler(f, &slog.HandlerOptions{Level: &level})
+		setLevel(debug)
+		slog.SetDefault(slog.New(handler))
 	})
-	return instance
 }
 
-// Debug logs a message only when debug mode is enabled in settings.
-func Debug(format string, args ...any) {
-	if !platform.IsDebugEnabled() {
-		return
+// New returns a *slog.Logger tagged with the given component name.
+// If Init has not been called, returns a no-op logger that discards output.
+func New(component string) *slog.Logger {
+	if handler == nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	get().Output(2, fmt.Sprintf("[DEBUG] "+format, args...))
+	return slog.New(handler).With("component", component)
 }
 
-// Info logs a message to the debug log file when debug mode is enabled.
-// In the daemon context, messages are always logged to stdout via the daemon's own logger.
-func Info(format string, args ...any) {
-	if !platform.IsDebugEnabled() {
-		return
+// SetDebug changes the minimum log level at runtime.
+// When enabled is true, Debug messages are written; otherwise only Info and above.
+func SetDebug(enabled bool) {
+	setLevel(enabled)
+}
+
+// Close flushes and closes the log file. Safe to call if Init was never called.
+func Close() {
+	if logFile != nil {
+		logFile.Close()
 	}
-	get().Output(2, fmt.Sprintf("[INFO] "+format, args...))
+}
+
+func setLevel(debug bool) {
+	if debug {
+		level.Set(slog.LevelDebug)
+	} else {
+		level.Set(slog.LevelInfo)
+	}
 }

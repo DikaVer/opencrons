@@ -62,6 +62,8 @@ func runSetupWizard() error {
 		return fmt.Errorf("saving settings: %w", err)
 	}
 
+	cmdlog.Info("setup wizard completed", "provider", result.Provider, "daemonMode", result.DaemonMode)
+
 	// Re-create provider symlinks now that settings (with provider ID) are saved.
 	// EnsureDirs ran before settings were written, so symlinks couldn't be created then.
 	if err := platform.EnsureProviderSymlinks(); err != nil {

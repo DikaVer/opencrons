@@ -50,6 +50,7 @@ func disableJob(name string) error {
 		return fmt.Errorf("saving job config: %w", err)
 	}
 
+	cmdlog.Info("job disabled", "name", name)
 	fmt.Printf("Job %q disabled. It will be skipped by the daemon.\n", name)
 	return nil
 }

@@ -16,7 +16,11 @@ import (
 // WritePID writes the current process ID to the PID file.
 func WritePID() error {
 	pid := os.Getpid()
-	return os.WriteFile(PIDFile(), []byte(strconv.Itoa(pid)), 0644)
+	if err := os.WriteFile(PIDFile(), []byte(strconv.Itoa(pid)), 0644); err != nil {
+		return err
+	}
+	plog.Debug("PID file written", "pid", pid, "path", PIDFile())
+	return nil
 }
 
 // ReadPID reads the PID from the PID file.
@@ -36,6 +40,7 @@ func ReadPID() (int, error) {
 
 // RemovePID removes the PID file.
 func RemovePID() error {
+	plog.Debug("PID file removed", "path", PIDFile())
 	return os.Remove(PIDFile())
 }
 

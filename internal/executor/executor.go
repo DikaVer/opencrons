@@ -24,6 +24,8 @@ import (
 	"github.com/DikaVer/opencrons/internal/storage"
 )
 
+var log = logger.New("executor")
+
 // claudeOutput represents the JSON output from `claude -p --output-format json`.
 type claudeOutput struct {
 	Result       string  `json:"result"`
@@ -55,7 +57,7 @@ type Result struct {
 
 // Run executes a job and logs the result to the database.
 func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType string) (*Result, error) {
-	logger.Debug("Starting job %q (trigger=%s, dir=%s)", job.Name, triggerType, job.WorkingDir)
+	log.Info("job started", "name", job.Name, "trigger", triggerType, "dir", job.WorkingDir)
 
 	// Validate working directory still exists at runtime
 	if info, err := os.Stat(job.WorkingDir); err != nil {
@@ -68,7 +70,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	timestamp := now.Format("20060102-150405")
 
 	// Create log entry
-	log := &storage.ExecutionLog{
+	entry := &storage.ExecutionLog{
 		JobID:       job.ID,
 		JobName:     job.Name,
 		StartedAt:   now,
@@ -76,7 +78,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		TriggerType: triggerType,
 	}
 
-	logID, err := db.InsertLog(log)
+	logID, err := db.InsertLog(entry)
 	if err != nil {
 		return nil, fmt.Errorf("creating execution log: %w", err)
 	}
@@ -116,7 +118,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 			ErrorMsg: err.Error(),
 		}
 		if updateErr := db.UpdateLog(logID, time.Now(), -1, stdoutPath, stderrPath, 0, 0, 0, 0, 0, "failed", err.Error()); updateErr != nil {
-			logger.Debug("Failed to update log %d for job %q after build error: %v", logID, job.Name, updateErr)
+			log.Error("failed to update log", "logID", logID, "job", job.Name, "err", updateErr)
 		}
 		return result, nil
 	}
@@ -145,6 +147,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		result.ExitCode = -1
 		result.Status = "timeout"
 		result.ErrorMsg = fmt.Sprintf("job timed out after %ds", job.Timeout)
+		log.Info("job timed out", "name", job.Name, "timeout", job.Timeout)
 	} else if runErr != nil {
 		if exitErr, ok := runErr.(*exec.ExitError); ok {
 			result.ExitCode = exitErr.ExitCode()
@@ -153,6 +156,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		}
 		result.Status = "failed"
 		result.ErrorMsg = runErr.Error()
+		log.Info("job command failed", "name", job.Name, "exit", result.ExitCode, "err", runErr)
 	} else {
 		result.ExitCode = 0
 		result.Status = "success"
@@ -172,11 +176,11 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		result.CostUSD, result.InputTokens, result.OutputTokens,
 		result.CacheReadTokens, result.CacheCreationTokens,
 		result.Status, result.ErrorMsg); updateErr != nil {
-		logger.Debug("Failed to finalize log %d for job %q: %v", logID, job.Name, updateErr)
+		log.Error("failed to finalize log", "logID", logID, "job", job.Name, "err", updateErr)
 	}
 
-	logger.Debug("Job %q finished: status=%s exit=%d duration=%s cost=$%.4f",
-		job.Name, result.Status, result.ExitCode, result.Duration, result.CostUSD)
+	log.Info("job finished", "name", job.Name, "status", result.Status,
+		"exit", result.ExitCode, "duration", result.Duration, "cost", result.CostUSD)
 
 	return result, nil
 }
@@ -188,7 +192,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 func parseUsage(stdoutPath string, result *Result) {
 	f, err := os.Open(stdoutPath)
 	if err != nil {
-		logger.Debug("parseUsage: cannot open %s: %v", stdoutPath, err)
+		log.Debug("parseUsage: cannot open file", "path", stdoutPath, "err", err)
 		return
 	}
 	defer f.Close()
@@ -204,7 +208,7 @@ func parseUsage(stdoutPath string, result *Result) {
 	}
 
 	if len(lines) == 0 {
-		logger.Debug("parseUsage: stdout file is empty: %s", stdoutPath)
+		log.Debug("parseUsage: stdout file is empty", "path", stdoutPath)
 		return
 	}
 
@@ -240,12 +244,12 @@ func parseUsage(stdoutPath string, result *Result) {
 	}
 
 	if !parsed {
-		logger.Debug("parseUsage: no parseable JSON found in %s", stdoutPath)
+		log.Warn("parseUsage: no parseable JSON found", "path", stdoutPath)
 		return
 	}
 
-	logger.Debug("parseUsage: result=%q cost=$%.4f tokens(in=%d out=%d)",
-		output.Result, output.TotalCostUSD, output.Usage.InputTokens, output.Usage.OutputTokens)
+	log.Debug("parseUsage: parsed", "cost", output.TotalCostUSD,
+		"inputTokens", output.Usage.InputTokens, "outputTokens", output.Usage.OutputTokens)
 
 	result.Output = output.Result
 	result.CostUSD = output.TotalCostUSD

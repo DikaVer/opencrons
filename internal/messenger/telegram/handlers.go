@@ -18,7 +18,6 @@ import (
 
 	"github.com/DikaVer/opencrons/internal/config"
 	"github.com/DikaVer/opencrons/internal/executor"
-	"github.com/DikaVer/opencrons/internal/logger"
 	"github.com/DikaVer/opencrons/internal/platform"
 )
 
@@ -44,10 +43,10 @@ func (b *Bot) handleNew(ctx context.Context, tgBot *bot.Bot, update *models.Upda
 	// Deactivate existing sessions via session manager
 	if b.sessionMgr != nil {
 		if err := b.sessionMgr.ClearSession(userID); err != nil {
-			logger.Debug("Error clearing session for user %d: %v", userID, err)
+			slogger.Warn("error clearing session", "userID", userID, "err", err)
 		}
 	} else if err := b.db.DeactivateUserSessions(userID); err != nil {
-		logger.Debug("Error deactivating sessions for user %d: %v", userID, err)
+		slogger.Warn("error deactivating sessions", "userID", userID, "err", err)
 	}
 
 	b.SendPlain(ctx, chatID, "Session cleared. Send a message to start a fresh conversation with Claude.")
@@ -300,6 +299,7 @@ func (b *Bot) toggleJob(ctx context.Context, chatID int64, jobName string, enabl
 	}
 	b.SendPlain(ctx, chatID, fmt.Sprintf("Job %q %s.", jobName, action))
 	b.stdlog.Printf("[telegram] Job %q %s via Telegram", jobName, action)
+	slogger.Info("job toggled via telegram", "job", jobName, "action", action)
 }
 
 // runJob executes a job immediately.
@@ -315,6 +315,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		return
 	}
 
+	slogger.Info("job run requested via telegram", "job", jobName)
 	b.SendPlain(ctx, chatID, fmt.Sprintf("Running job %q...", jobName))
 
 	// Use a background context for execution and result delivery — the
@@ -353,7 +354,7 @@ func (b *Bot) handleModelCallback(ctx context.Context, tgBot *bot.Bot, update *m
 	session, _ := b.db.GetActiveSession(userID)
 	if session != nil {
 		if err := b.db.UpdateSessionModel(session.ID, model); err != nil {
-			logger.Debug("Error updating session model: %v", err)
+			slogger.Warn("error updating session model", "err", err)
 		}
 	}
 
@@ -381,7 +382,7 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 	session, _ := b.db.GetActiveSession(userID)
 	if session != nil {
 		if err := b.db.UpdateSessionEffort(session.ID, effort); err != nil {
-			logger.Debug("Error updating session effort: %v", err)
+			slogger.Warn("error updating session effort", "err", err)
 		}
 	}
 
@@ -415,19 +416,19 @@ func (b *Bot) sendJobOutput(ctx context.Context, chatID int64, jobName, status, 
 	msg := strings.TrimSpace(output)
 	if msg == "" {
 		msg = fmt.Sprintf("Job '%s' completed: %s", jobName, status)
-		logger.Debug("sendJobOutput: no output for %q, sending status-only", jobName)
+		slogger.Debug("sendJobOutput: no output, sending status-only", "job", jobName)
 	} else {
 		if status != "success" {
 			msg = fmt.Sprintf("Job '%s' (%s):\n\n%s", jobName, status, msg)
 		}
 		msg = truncateForTelegram(msg, jobName)
-		logger.Debug("sendJobOutput: sending output for %q to %d (%d bytes)", jobName, chatID, len(msg))
+		slogger.Debug("sendJobOutput: sending output", "job", jobName, "chatID", chatID, "bytes", len(msg))
 	}
 
 	if err := b.Send(ctx, chatID, msg); err != nil {
-		logger.Debug("sendJobOutput: HTML send failed for %q to %d: %v", jobName, chatID, err)
+		slogger.Warn("sendJobOutput: HTML send failed", "job", jobName, "chatID", chatID, "err", err)
 		if plainErr := b.SendPlain(ctx, chatID, msg); plainErr != nil {
-			logger.Debug("sendJobOutput: plain send also failed for %q to %d: %v", jobName, chatID, plainErr)
+			slogger.Error("sendJobOutput: plain send also failed", "job", jobName, "chatID", chatID, "err", plainErr)
 			failMsg := fmt.Sprintf("Job '%s' completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, status, jobName)
 			if assertErr := b.SendPlain(ctx, chatID, failMsg); assertErr != nil {
 				b.stdlog.Printf("[telegram] sendJobOutput: all delivery attempts failed for chat %d, job %q: %v", chatID, jobName, assertErr)

@@ -42,9 +42,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	foreground, _ := cmd.Flags().GetBool("foreground")
 	if foreground {
+		cmdlog.Info("daemon start requested", "mode", "foreground")
 		fmt.Println("Starting OpenCron daemon (foreground)...")
 		return daemon.Run()
 	}
+
+	cmdlog.Info("daemon start requested", "mode", "background")
 
 	// Default: spawn detached background process and return.
 	pid, err := daemon.RunBackground()

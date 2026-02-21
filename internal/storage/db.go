@@ -11,8 +11,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DikaVer/opencrons/internal/logger"
 	_ "modernc.org/sqlite"
 )
+
+var log = logger.New("storage")
 
 // DB wraps the SQLite database connection.
 type DB struct {
@@ -32,6 +35,7 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("migrating database: %w", err)
 	}
 
+	log.Debug("database opened", "path", path)
 	return db, nil
 }
 
@@ -109,15 +113,16 @@ func (db *DB) migrate() error {
 		return err
 	}
 
+	log.Info("schema migration complete")
 	return nil
 }
 
 // InsertLog creates a new execution log entry and returns its ID.
-func (db *DB) InsertLog(log *ExecutionLog) (int64, error) {
+func (db *DB) InsertLog(entry *ExecutionLog) (int64, error) {
 	result, err := db.conn.Exec(
 		`INSERT INTO execution_logs (job_id, job_name, started_at, status, trigger_type)
 		 VALUES (?, ?, ?, ?, ?)`,
-		log.JobID, log.JobName, log.StartedAt, log.Status, log.TriggerType,
+		entry.JobID, entry.JobName, entry.StartedAt, entry.Status, entry.TriggerType,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("inserting log: %w", err)
@@ -376,56 +381,58 @@ func (db *DB) DeactivateStaleSessions(maxIdle time.Duration) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("deactivating stale sessions: %w", err)
 	}
-	return result.RowsAffected()
+	n, _ := result.RowsAffected()
+	log.Debug("stale sessions deactivated", "count", n, "maxIdle", maxIdle)
+	return n, nil
 }
 
 func scanLogs(rows *sql.Rows) ([]ExecutionLog, error) {
 	var logs []ExecutionLog
 	for rows.Next() {
-		var log ExecutionLog
+		var entry ExecutionLog
 		var finishedAt sql.NullTime
 		var exitCode sql.NullInt64
 		var costUSD sql.NullFloat64
 		var inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens sql.NullInt64
 
 		err := rows.Scan(
-			&log.ID, &log.JobID, &log.JobName, &log.StartedAt, &finishedAt,
-			&exitCode, &log.StdoutPath, &log.StderrPath, &costUSD,
+			&entry.ID, &entry.JobID, &entry.JobName, &entry.StartedAt, &finishedAt,
+			&exitCode, &entry.StdoutPath, &entry.StderrPath, &costUSD,
 			&inputTokens, &outputTokens, &cacheReadTokens, &cacheCreationTokens,
-			&log.Status, &log.TriggerType, &log.ErrorMsg,
+			&entry.Status, &entry.TriggerType, &entry.ErrorMsg,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning log row: %w", err)
 		}
 
 		if finishedAt.Valid {
-			log.FinishedAt = &finishedAt.Time
+			entry.FinishedAt = &finishedAt.Time
 		}
 		if exitCode.Valid {
 			code := int(exitCode.Int64)
-			log.ExitCode = &code
+			entry.ExitCode = &code
 		}
 		if costUSD.Valid {
-			log.CostUSD = &costUSD.Float64
+			entry.CostUSD = &costUSD.Float64
 		}
 		if inputTokens.Valid {
 			v := int(inputTokens.Int64)
-			log.InputTokens = &v
+			entry.InputTokens = &v
 		}
 		if outputTokens.Valid {
 			v := int(outputTokens.Int64)
-			log.OutputTokens = &v
+			entry.OutputTokens = &v
 		}
 		if cacheReadTokens.Valid {
 			v := int(cacheReadTokens.Int64)
-			log.CacheReadTokens = &v
+			entry.CacheReadTokens = &v
 		}
 		if cacheCreationTokens.Valid {
 			v := int(cacheCreationTokens.Int64)
-			log.CacheCreationTokens = &v
+			entry.CacheCreationTokens = &v
 		}
 
-		logs = append(logs, log)
+		logs = append(logs, entry)
 	}
 	return logs, rows.Err()
 }
