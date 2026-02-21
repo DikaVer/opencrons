@@ -327,35 +327,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		return
 	}
 
-	logger.Debug("runJob: %q finished status=%s output=%d bytes", jobName, result.Status, len(result.Output))
-
-	// Send job output if available, otherwise fall back to generic status
-	if output := strings.TrimSpace(result.Output); output != "" {
-		msg := output
-		if result.Status != "success" {
-			msg = fmt.Sprintf("Job %q (%s):\n\n%s", jobName, result.Status, msg)
-		}
-		msg = truncateForTelegram(msg, jobName)
-		if sendErr := b.Send(execCtx, chatID, msg); sendErr != nil {
-			logger.Debug("runJob: HTML send failed for %q: %v", jobName, sendErr)
-			if plainErr := b.SendPlain(execCtx, chatID, msg); plainErr != nil {
-				logger.Debug("runJob: plain send also failed for %q: %v", jobName, plainErr)
-				b.SendPlain(execCtx, chatID, fmt.Sprintf("Job %q completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, result.Status, jobName))
-			}
-		}
-		b.stdlog.Printf("[telegram] Job %q executed: status=%s (output sent)", jobName, result.Status)
-		return
-	}
-
-	msg := fmt.Sprintf("Job %q finished\nStatus: %s\nDuration: %s", jobName, result.Status, result.Duration.Round(1e9))
-	if result.CostUSD > 0 {
-		msg += fmt.Sprintf("\nCost: $%.4f", result.CostUSD)
-	}
-	if result.ErrorMsg != "" {
-		msg += fmt.Sprintf("\nError: %s", result.ErrorMsg)
-	}
-
-	b.SendPlain(execCtx, chatID, msg)
+	b.sendJobOutput(execCtx, chatID, jobName, result.Status, result.Output)
 	b.stdlog.Printf("[telegram] Job %q executed: status=%s", jobName, result.Status)
 }
 
@@ -420,21 +392,6 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 // NotifyJobComplete sends a job completion notification to all authorized chats.
 // If output is non-empty, the job's output text is sent directly.
 func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, output string) {
-	// Use job output as the notification message; fall back to generic status
-	msg := strings.TrimSpace(output)
-	if msg == "" {
-		msg = fmt.Sprintf("Job '%s' completed: %s", jobName, status)
-		logger.Debug("NotifyJobComplete: no output for %q, sending status-only message", jobName)
-	} else {
-		// Prepend status header for non-success jobs so the user knows
-		if status != "success" {
-			msg = fmt.Sprintf("Job '%s' (%s):\n\n%s", jobName, status, msg)
-		}
-		msg = truncateForTelegram(msg, jobName)
-		logger.Debug("NotifyJobComplete: sending output for %q (%d bytes)", jobName, len(msg))
-	}
-
-	// Notify all authorized users
 	sent := 0
 	for userStr, allowed := range b.settings.AllowedUsers {
 		if !allowed || strings.HasPrefix(userStr, "__") {
@@ -443,24 +400,42 @@ func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, output str
 		var userID int64
 		fmt.Sscanf(userStr, "%d", &userID)
 		if userID > 0 {
-			if err := b.Send(ctx, userID, msg); err != nil {
-				logger.Debug("NotifyJobComplete: HTML send failed for user %d: %v, falling back to plain", userID, err)
-				if plainErr := b.SendPlain(ctx, userID, msg); plainErr != nil {
-					logger.Debug("NotifyJobComplete: plain send also failed for user %d: %v", userID, plainErr)
-					// Notify user that output was generated but delivery failed
-					failMsg := fmt.Sprintf("Job '%s' completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, status, jobName)
-					if assertErr := b.SendPlain(ctx, userID, failMsg); assertErr != nil {
-						b.stdlog.Printf("[telegram] NotifyJobComplete: all delivery attempts failed for user %d, job %q: %v", userID, jobName, assertErr)
-					}
-				} else {
-					sent++
-				}
-			} else {
+			if b.sendJobOutput(ctx, userID, jobName, status, output) {
 				sent++
 			}
 		}
 	}
 	b.stdlog.Printf("[telegram] Job %q notification sent to %d user(s)", jobName, sent)
+}
+
+// sendJobOutput delivers a job's result to a single chat. Used by both
+// NotifyJobComplete (scheduled/CLI) and runJob (Telegram Run Now).
+// Returns true if the message was delivered successfully.
+func (b *Bot) sendJobOutput(ctx context.Context, chatID int64, jobName, status, output string) bool {
+	msg := strings.TrimSpace(output)
+	if msg == "" {
+		msg = fmt.Sprintf("Job '%s' completed: %s", jobName, status)
+		logger.Debug("sendJobOutput: no output for %q, sending status-only", jobName)
+	} else {
+		if status != "success" {
+			msg = fmt.Sprintf("Job '%s' (%s):\n\n%s", jobName, status, msg)
+		}
+		msg = truncateForTelegram(msg, jobName)
+		logger.Debug("sendJobOutput: sending output for %q to %d (%d bytes)", jobName, chatID, len(msg))
+	}
+
+	if err := b.Send(ctx, chatID, msg); err != nil {
+		logger.Debug("sendJobOutput: HTML send failed for %q to %d: %v", jobName, chatID, err)
+		if plainErr := b.SendPlain(ctx, chatID, msg); plainErr != nil {
+			logger.Debug("sendJobOutput: plain send also failed for %q to %d: %v", jobName, chatID, plainErr)
+			failMsg := fmt.Sprintf("Job '%s' completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, status, jobName)
+			if assertErr := b.SendPlain(ctx, chatID, failMsg); assertErr != nil {
+				b.stdlog.Printf("[telegram] sendJobOutput: all delivery attempts failed for chat %d, job %q: %v", chatID, jobName, assertErr)
+			}
+			return false
+		}
+	}
+	return true
 }
 
 // truncateForTelegram ensures a message fits within Telegram's 4096-character
