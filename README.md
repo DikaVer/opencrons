@@ -59,9 +59,6 @@ OpenCron takes that core use case and gives it the dedicated tooling it deserves
 | 🎯 **Focus** | General-purpose AI assistant | Purpose-built cron scheduler |
 | 👁️ **Visibility** | Jobs buried in a JSON file | Interactive TUI + structured logs |
 | 📊 **Tracking** | Minimal job history | SQLite with cost, tokens, status per run |
-| 🔄 **Hot-reload** | Restart required | fsnotify watches config — zero downtime |
-| 🐛 **Reliability** | [Known cron bugs](https://github.com/openclaw/openclaw/issues/9575) in recent releases | Dedicated cron engine with `SkipIfStillRunning` |
-| 💬 **Chat** | Full multi-platform chat | Focused Telegram chat alongside jobs |
 | 🔐 **Auth** | Uses Claude Code OAuth | Uses Claude Code directly — fully compliant |
 
 If you need a Swiss Army knife, use OpenClaw. If you need your cron jobs to **just work** — with clear visibility, cost tracking, and a beautiful interface — that's OpenCron.
