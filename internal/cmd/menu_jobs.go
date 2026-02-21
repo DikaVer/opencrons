@@ -7,11 +7,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 
 	"github.com/DikaVer/opencrons/internal/config"
 	"github.com/DikaVer/opencrons/internal/executor"
+	"github.com/DikaVer/opencrons/internal/messenger/telegram"
 	"github.com/DikaVer/opencrons/internal/platform"
 	"github.com/DikaVer/opencrons/internal/storage"
 	"github.com/DikaVer/opencrons/internal/tui"
@@ -168,5 +170,18 @@ func runJobByName(name string) {
 	}
 	if result.ErrorMsg != "" {
 		fmt.Printf("  Error:    %s\n", result.ErrorMsg)
+	}
+
+	// Send output to Telegram if summary is enabled and output is available
+	if job.SummaryEnabled && result.Output != "" {
+		if msgCfg := platform.GetMessengerConfig(); msgCfg != nil && msgCfg.Type == "telegram" {
+			tgBot, err := telegram.New(db, msgCfg, log.New(os.Stderr, "", 0))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  Warning: Telegram notification failed: %v\n", err)
+			} else {
+				tgBot.NotifyJobComplete(ctx, job.Name, result.Status, result.Output)
+				fmt.Println("  Summary sent to Telegram.")
+			}
+		}
 	}
 }
