@@ -39,7 +39,7 @@ I'll ask a couple of questions, draft the prompt, and get it all wired up.
 The interactive scheduling skill lives at:
 
 ```
-.workspace/.agents/skills/schedule/SKILL.md
+.agents/skills/schedule/SKILL.md
 ```
 
 **Install it once, use it everywhere:**
@@ -47,11 +47,11 @@ The interactive scheduling skill lives at:
 ```bash
 # Linux/macOS
 mkdir -p ~/.claude/skills/schedule
-cp .workspace/.agents/skills/schedule/SKILL.md ~/.claude/skills/schedule/SKILL.md
+cp .agents/skills/schedule/SKILL.md ~/.claude/skills/schedule/SKILL.md
 
 # Windows (PowerShell)
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills\schedule"
-Copy-Item .workspace\.agents\skills\schedule\SKILL.md "$env:USERPROFILE\.claude\skills\schedule\SKILL.md"
+Copy-Item .agents\skills\schedule\SKILL.md "$env:USERPROFILE\.claude\skills\schedule\SKILL.md"
 
 # Or just
 make install-skill

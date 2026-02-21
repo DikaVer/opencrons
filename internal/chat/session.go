@@ -50,8 +50,8 @@ func (sm *SessionManager) GetOrCreateSession(userID, chatID int64) (*storage.Cha
 func (sm *SessionManager) CreateSession(userID, chatID int64) (*storage.ChatSession, error) {
 	chatCfg := platform.GetChatConfig()
 
-	// Use the managed workspace directory so Claude sees CLAUDE.md/.claude context.
-	workingDir := platform.WorkspaceDir()
+	// Use BaseDir so Claude sees AGENTS.md/.agents (with provider symlinks like CLAUDE.md/.claude).
+	workingDir := platform.BaseDir()
 	if workingDir == "" {
 		workingDir = "."
 	}

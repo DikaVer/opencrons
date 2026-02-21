@@ -3,9 +3,9 @@
 //
 // BaseDir returns the root configuration directory (with a test override mechanism).
 // Derived paths include SchedulesDir, PromptsDir, LogsDir, SummaryDir, DataDir,
-// DBPath, PIDFile, and WorkspaceDir. EnsureDirs creates all required directories
-// on first run. The actual default base directory is resolved by platform-specific
-// implementations of defaultBaseDir.
+// DBPath, PIDFile, AgentsDir, AgentsFile, SkillsDir, ProjectsDir, and ProjectDir.
+// EnsureDirs creates all required directories on first run. The actual default
+// base directory is resolved by platform-specific implementations of defaultBaseDir.
 package platform
 
 import (
@@ -63,13 +63,41 @@ func PIDFile() string {
 	return filepath.Join(BaseDir(), "opencrons.pid")
 }
 
-// WorkspaceDir returns the path to the workspace directory (CLAUDE.md + .claude/).
-func WorkspaceDir() string {
-	return filepath.Join(BaseDir(), "workspace")
+// AgentsDir returns the path to the canonical .agents/ directory.
+func AgentsDir() string {
+	return filepath.Join(BaseDir(), ".agents")
+}
+
+// AgentsFile returns the path to the canonical AGENTS.md file.
+func AgentsFile() string {
+	return filepath.Join(BaseDir(), "AGENTS.md")
+}
+
+// SkillsDir returns the path to the skills directory inside .agents/.
+func SkillsDir() string {
+	return filepath.Join(AgentsDir(), "skills")
+}
+
+// ProjectsDir returns the path to the projects directory (per-job workspace data).
+// Reserved for future use — not yet created by EnsureDirs.
+func ProjectsDir() string {
+	return filepath.Join(BaseDir(), "projects")
+}
+
+// ProjectDir returns the path to a specific job's project directory.
+// Reserved for future use — not yet created by EnsureDirs.
+func ProjectDir(jobName string) string {
+	return filepath.Join(ProjectsDir(), jobName)
 }
 
 // EnsureDirs creates all required directories if they don't exist.
+// It also runs the V1 migration and creates provider-specific symlinks.
 func EnsureDirs() error {
+	// Migrate old workspace/ layout before creating new dirs
+	if err := MigrateFromV1Layout(); err != nil {
+		return err
+	}
+
 	dirs := []string{
 		BaseDir(),
 		SchedulesDir(),
@@ -77,13 +105,19 @@ func EnsureDirs() error {
 		LogsDir(),
 		SummaryDir(),
 		DataDir(),
-		WorkspaceDir(),
+		AgentsDir(),
+		SkillsDir(),
 	}
 
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
+	}
+
+	// Create provider-specific symlinks (.claude/ → .agents/, CLAUDE.md → AGENTS.md)
+	if err := EnsureProviderSymlinks(); err != nil {
+		return err
 	}
 
 	return nil

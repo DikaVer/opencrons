@@ -211,7 +211,7 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 
 		// Notify via Telegram if bot is running
 		if bot := d.tgBot.Load(); bot != nil {
-			bot.NotifyJobComplete(ctx, j.Name, result.Status, result.SummaryPath)
+			bot.NotifyJobComplete(ctx, j.Name, result.Status, result.Output)
 		}
 	})
 	if err != nil {

@@ -11,7 +11,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/go-telegram/bot"
@@ -324,17 +323,20 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		return
 	}
 
-	// If summary file exists, send that instead of a generic message
-	if result.SummaryPath != "" {
-		data, err := os.ReadFile(result.SummaryPath)
-		if err == nil && len(data) > 0 {
-			summary := strings.TrimSpace(string(data))
-			if sendErr := b.Send(ctx, chatID, summary); sendErr != nil {
-				b.SendPlain(ctx, chatID, summary)
-			}
-			b.stdlog.Printf("[telegram] Job %q executed: status=%s (summary sent)", jobName, result.Status)
-			return
+	// Send job output if available, otherwise fall back to generic status
+	if output := strings.TrimSpace(result.Output); output != "" {
+		msg := output
+		if result.Status != "success" {
+			msg = fmt.Sprintf("Job %q (%s):\n\n%s", jobName, result.Status, msg)
 		}
+		msg = truncateForTelegram(msg, jobName)
+		if sendErr := b.Send(ctx, chatID, msg); sendErr != nil {
+			if plainErr := b.SendPlain(ctx, chatID, msg); plainErr != nil {
+				b.SendPlain(ctx, chatID, fmt.Sprintf("Job %q completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, result.Status, jobName))
+			}
+		}
+		b.stdlog.Printf("[telegram] Job %q executed: status=%s (output sent)", jobName, result.Status)
+		return
 	}
 
 	msg := fmt.Sprintf("Job %q finished\nStatus: %s\nDuration: %s", jobName, result.Status, result.Duration.Round(1e9))
@@ -408,20 +410,20 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 }
 
 // NotifyJobComplete sends a job completion notification to all authorized chats.
-// If summaryPath is non-empty and the file exists, the summary content is sent.
-func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, summaryPath string) {
-	msg := fmt.Sprintf("Job '%s' completed: %s", jobName, status)
-
-	// Read summary file if available
-	if summaryPath != "" {
-		data, err := os.ReadFile(summaryPath)
-		if err != nil {
-			logger.Debug("NotifyJobComplete: failed to read summary %s: %v", summaryPath, err)
-			b.stdlog.Printf("[telegram] Job %q summary file not found: %s", jobName, summaryPath)
-		} else if len(data) > 0 {
-			msg = strings.TrimSpace(string(data))
-			logger.Debug("NotifyJobComplete: sending summary for %q (%d bytes)", jobName, len(data))
+// If output is non-empty, the job's output text is sent directly.
+func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, output string) {
+	// Use job output as the notification message; fall back to generic status
+	msg := strings.TrimSpace(output)
+	if msg == "" {
+		msg = fmt.Sprintf("Job '%s' completed: %s", jobName, status)
+		logger.Debug("NotifyJobComplete: no output for %q, sending status-only message", jobName)
+	} else {
+		// Prepend status header for non-success jobs so the user knows
+		if status != "success" {
+			msg = fmt.Sprintf("Job '%s' (%s):\n\n%s", jobName, status, msg)
 		}
+		msg = truncateForTelegram(msg, jobName)
+		logger.Debug("NotifyJobComplete: sending output for %q (%d bytes)", jobName, len(msg))
 	}
 
 	// Notify all authorized users
@@ -437,6 +439,11 @@ func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, summaryPat
 				logger.Debug("NotifyJobComplete: HTML send failed for user %d: %v, falling back to plain", userID, err)
 				if plainErr := b.SendPlain(ctx, userID, msg); plainErr != nil {
 					logger.Debug("NotifyJobComplete: plain send also failed for user %d: %v", userID, plainErr)
+					// Notify user that output was generated but delivery failed
+					failMsg := fmt.Sprintf("Job '%s' completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, status, jobName)
+					if assertErr := b.SendPlain(ctx, userID, failMsg); assertErr != nil {
+						b.stdlog.Printf("[telegram] NotifyJobComplete: all delivery attempts failed for user %d, job %q: %v", userID, jobName, assertErr)
+					}
 				} else {
 					sent++
 				}
@@ -446,6 +453,17 @@ func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, summaryPat
 		}
 	}
 	b.stdlog.Printf("[telegram] Job %q notification sent to %d user(s)", jobName, sent)
+}
+
+// truncateForTelegram ensures a message fits within Telegram's 4096-character
+// limit, appending a hint to check logs if the output is too long.
+func truncateForTelegram(msg, jobName string) string {
+	const maxLen = 4000 // leave headroom for HTML formatting overhead
+	if len(msg) <= maxLen {
+		return msg
+	}
+	suffix := fmt.Sprintf("\n\n[Output truncated — full output: opencrons logs %s]", jobName)
+	return msg[:maxLen-len(suffix)] + suffix
 }
 
 func modelLabel(model, current string) string {

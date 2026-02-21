@@ -24,6 +24,7 @@ import (
 
 // claudeOutput represents the JSON output from `claude -p --output-format json`.
 type claudeOutput struct {
+	Result       string  `json:"result"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
 	Usage        struct {
 		InputTokens              int `json:"input_tokens"`
@@ -39,6 +40,7 @@ type Result struct {
 	StdoutPath          string
 	StderrPath          string
 	SummaryPath         string // path to summary file (if summary_enabled)
+	Output              string // claude's result text from JSON output
 	Status              string
 	ErrorMsg            string
 	Duration            time.Duration
@@ -189,6 +191,7 @@ func parseUsage(stdoutPath string, result *Result) {
 		return
 	}
 
+	result.Output = output.Result
 	result.CostUSD = output.TotalCostUSD
 	result.InputTokens = output.Usage.InputTokens
 	result.OutputTokens = output.Usage.OutputTokens

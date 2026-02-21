@@ -280,24 +280,24 @@ func injectPluginEnv(cmd *exec.Cmd, cfgs map[string]platform.PluginConfig) {
 
 ### For chat sessions (workspace)
 
-Chat sessions run from `platform.WorkspaceDir()`, so the LLM sees whatever is in that directory. Plugin skills are written as files in the workspace's skill directory.
-
-> **Path note:** The workspace example uses `.agents/skills/` (copied from `.workspace-example/.agents/`). During setup, `cmd/setup.go:copyWorkspace()` renames `.agents/` to `.claude/`. Therefore the runtime workspace uses `.claude/skills/`, which is what Claude Code reads. Plugin skill files go here:
+Chat sessions run from `platform.BaseDir()`, so the LLM sees whatever is in that directory. Plugin skills are written as files in the canonical `.agents/skills/` directory. Provider symlinks (e.g., `.claude/` → `.agents/`) ensure provider tools find them.
 
 ```
-<BaseDir>/workspace/
-├── CLAUDE.md                           ← existing (copied from .workspace-example/AGENTS.md)
-├── .claude/
+<BaseDir>/
+├── AGENTS.md                           ← canonical (copied from .workspace-example/AGENTS.md)
+├── CLAUDE.md → AGENTS.md               ← symlink (created by EnsureProviderSymlinks)
+├── .agents/
 │   └── skills/
 │       ├── schedule/SKILL.md           ← existing
 │       ├── github/SKILL.md             ← NEW: written when GitHub plugin is enabled
 │       ├── gmail/SKILL.md              ← NEW: written when Gmail plugin is enabled
 │       └── linear/SKILL.md             ← NEW: written when Linear plugin is enabled
+├── .claude/ → .agents/                 ← symlink (created by EnsureProviderSymlinks)
 ```
 
 **When to write/remove skill files:**
 
-- **Plugin enabled:** Write `SKILL.md` to `workspace/.claude/skills/<plugin-id>/SKILL.md`
+- **Plugin enabled:** Write `SKILL.md` to `.agents/skills/<plugin-id>/SKILL.md`
 - **Plugin disabled:** Remove the skill directory
 - **Setup/reconfigure:** Overwrite with fresh content
 
@@ -311,7 +311,7 @@ This should happen in:
 
 // SyncWorkspaceSkills ensures workspace skill files match enabled plugin state.
 func SyncWorkspaceSkills(cfgs map[string]platform.PluginConfig) error {
-    skillsDir := filepath.Join(platform.WorkspaceDir(), ".claude", "skills")
+    skillsDir := platform.SkillsDir()
 
     for _, p := range List() {
         pluginSkillDir := filepath.Join(skillsDir, p.ID())

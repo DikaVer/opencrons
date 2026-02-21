@@ -1,6 +1,7 @@
 // File setup.go implements the setup command and the runSetupWizard helper.
-// It runs the TUI setup wizard, copies .workspace-example/ files (AGENTS.md to CLAUDE.md,
-// .agents/ to .claude/) into the config directory, and saves the resulting settings.
+// It runs the TUI setup wizard, copies .workspace-example/ files (AGENTS.md, .agents/)
+// into the config BaseDir, and saves the resulting settings. Provider-specific symlinks
+// (e.g., .claude/ → .agents/) are created by EnsureDirs.
 package cmd
 
 import (
@@ -61,11 +62,18 @@ func runSetupWizard() error {
 		return fmt.Errorf("saving settings: %w", err)
 	}
 
+	// Re-create provider symlinks now that settings (with provider ID) are saved.
+	// EnsureDirs ran before settings were written, so symlinks couldn't be created then.
+	if err := platform.EnsureProviderSymlinks(); err != nil {
+		fmt.Fprintf(os.Stderr, "  Warning: could not create provider symlinks: %v\n", err)
+	}
+
 	return nil
 }
 
-// copyWorkspace copies .workspace-example/ from the executable's directory to the config workspace dir.
-// In the destination: AGENTS.md -> CLAUDE.md, .agents/ -> .claude/
+// copyWorkspace copies .workspace-example/ from the executable's directory to the
+// config BaseDir. Files are copied with their canonical names (AGENTS.md, .agents/).
+// Provider-specific symlinks are handled separately by EnsureDirs/EnsureProviderSymlinks.
 func copyWorkspace() error {
 	// Find the source .workspace-example directory relative to the executable
 	exePath, err := os.Executable()
@@ -99,12 +107,16 @@ func copyWorkspace() error {
 		return fmt.Errorf(".workspace-example directory not found")
 	}
 
-	destDir := platform.WorkspaceDir()
+	destDir := platform.BaseDir()
 
-	// Walk source and copy, performing renames
+	// Walk source and copy using canonical names (no renames needed).
+	// Skip files that already exist to preserve user customizations on re-runs.
 	return filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if path == srcDir {
+			return nil // skip root entry
 		}
 
 		relPath, err := filepath.Rel(srcDir, path)
@@ -112,13 +124,15 @@ func copyWorkspace() error {
 			return err
 		}
 
-		// Rename: AGENTS.md -> CLAUDE.md
-		relPath = renameWorkspacePath(relPath)
-
 		destPath := filepath.Join(destDir, relPath)
 
 		if d.IsDir() {
 			return os.MkdirAll(destPath, 0755)
+		}
+
+		// Don't overwrite existing files (user may have customized them)
+		if _, statErr := os.Stat(destPath); statErr == nil {
+			return nil
 		}
 
 		data, err := os.ReadFile(path)
@@ -128,26 +142,4 @@ func copyWorkspace() error {
 
 		return os.WriteFile(destPath, data, 0644)
 	})
-}
-
-// renameWorkspacePath applies workspace-to-config path renames.
-func renameWorkspacePath(relPath string) string {
-	// AGENTS.md -> CLAUDE.md
-	if relPath == "AGENTS.md" {
-		return "CLAUDE.md"
-	}
-
-	// .agents/ -> .claude/
-	if relPath == ".agents" {
-		return ".claude"
-	}
-	if len(relPath) > 8 && relPath[:8] == ".agents"+string(filepath.Separator) {
-		return ".claude" + relPath[7:]
-	}
-	// Also handle forward slashes
-	if len(relPath) > 8 && relPath[:8] == ".agents/" {
-		return ".claude" + relPath[7:]
-	}
-
-	return relPath
 }

@@ -23,6 +23,7 @@
   <a href="#-telegram-bot">Telegram bot</a> ·
   <a href="#-cli-reference">CLI reference</a> ·
   <a href="#%EF%B8%8F-configuration">Configuration</a> ·
+  <a href="#%EF%B8%8F-security">Security</a> ·
   <a href="#%EF%B8%8F-roadmap">Roadmap</a>
 
 </p>
@@ -32,6 +33,39 @@
 OpenCrons is an open-source scheduler that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude -p`) jobs on cron schedules. It pairs a terminal-native TUI with a Telegram bot — so you can define, monitor, and chat with your AI jobs from anywhere. Built for developers, researchers, and teams who want structured, repeatable AI automation.
 
 **Built with** Go · Cobra · Charmbracelet · SQLite · Catppuccin Mocha
+
+---
+
+
+## ⚠️ Security
+
+OpenCrons is a young project — security coverage is incomplete. Use it with this in mind.
+
+### Agent execution model
+
+Every scheduled job runs `claude -p` with `--permission-mode bypassPermissions`. This means:
+
+- **No sandbox** — the agent process runs with your full user permissions, in your working directory, with access to your filesystem, network, and any tools Claude Code can invoke
+- **No tool restrictions by default** — unless you explicitly set `disallowed_tools` on a job, the agent can read files, write files, run shell commands, and call external services
+- **Unattended** — jobs trigger on a cron schedule with no human in the loop to approve or reject individual actions
+
+This is intentional for automation — but it means **the prompt is the security boundary**. A poorly scoped prompt can lead to unintended writes, deletions, or network calls.
+
+**Practical guidance:**
+- Scope prompts tightly to the task at hand
+- Use `disallowed_tools` to restrict capabilities where possible (e.g. `Bash(rm:*)`)
+- Set a `working_dir` that contains only what the job needs access to
+- Review execution logs regularly (`opencrons logs`)
+- Keep your Claude Code version up to date
+
+### Known limitations
+
+- Prompt files are stored as plain Markdown — no encryption at rest
+- `settings.json` stores your Telegram bot token in plaintext
+- No audit log beyond the SQLite execution records
+- No rate limiting or circuit breaker on job execution
+
+This project just released and does not yet cover all security aspects. Contributions and issues are welcome.
 
 ---
 
@@ -197,7 +231,6 @@ The Telegram integration turns OpenCrons into a remote AI assistant you can reac
 2. 🔧 Run `opencrons setup` or `opencrons settings` to configure the bot token
 3. 🔐 Pair your account:
    - **Verification code** — OpenCrons generates a code, you send it to your bot to prove ownership
-   - **Allowlist** — manually enter Telegram user IDs or @usernames in settings
 
 ### Bot commands
 
@@ -293,19 +326,25 @@ OpenCrons stores its configuration and data in a platform-specific directory:
 
 ```
 ~/.opencrons/
-├── schedules/        # job configs (YAML)
-├── prompts/          # prompt files (Markdown)
-├── logs/             # execution stdout/stderr
-├── summary/          # execution summaries
-├── workspace/        # shared AGENTS.md
-├── data/opencrons.db  # SQLite database
-├── settings.json     # all settings
-└── opencrons.pid      # daemon lock file
+├── .agents/              # agent config directory (canonical)
+│   └── skills/           # scheduling skill + plugin skills
+├── .claude/ → .agents/   # provider symlink (Anthropic)
+├── AGENTS.md             # agent instructions (canonical)
+├── CLAUDE.md → AGENTS.md # provider symlink (Anthropic)
+├── schedules/            # job configs (YAML)
+├── prompts/              # prompt files (Markdown)
+├── logs/                 # execution stdout/stderr
+├── summary/              # execution summaries
+├── data/opencrons.db     # SQLite database
+├── settings.json         # all settings
+└── opencrons.pid         # daemon lock file
 ```
 
-### 🤖 Workspace (AGENTS.md)
+The `.agents/` directory and `AGENTS.md` file are the canonical (real) locations. Provider-specific names like `.claude/` and `CLAUDE.md` are created as symlinks so that each provider's tooling finds what it expects. On Windows without developer mode, junctions and hard links are used as fallbacks.
 
-OpenCrons copies a [`workspace/AGENTS.md`](.workspace-example/AGENTS.md) into your config directory during setup. This file is injected into every job as context — it acts as a shared system prompt so Claude understands it's running inside OpenCrons.
+### 🤖 Agent instructions (AGENTS.md)
+
+OpenCrons copies [`AGENTS.md`](.workspace-example/AGENTS.md) and [`.agents/`](.workspace-example/.agents/) into your config directory during setup. `AGENTS.md` is injected into every job as context — it acts as a shared system prompt so Claude understands it's running inside OpenCrons.
 
 You can customize it to add project-wide instructions, coding standards, or constraints that apply to all your scheduled jobs.
 
@@ -358,11 +397,12 @@ OpenCrons is focused on Claude Code today, but the vision is broader.
 
 ### 🔮 Future ideas
 
-- 📈 Web dashboard for job monitoring and cost analytics
-- 🔗 Job chaining — pipe output from one job into the next
 - 🏷️ Job tags and filtering
 - 📱 Push notifications (beyond Telegram)
 - 🔀 **Multi-provider jobs** — run the same prompt against Claude and GPT in parallel, compare results
+- 🧠 **Agent task memory** — persistent per-job memory that survives between runs; agents accumulate context across executions rather than starting cold each time
+- 🔄 **Workflow agent pipeline** — chain multiple agents into a directed pipeline where each agent's output becomes the next one's input; branch on conditions, fan out in parallel, merge results
+- 📦 **Sandbox environment** — run agents inside an isolated container or VM with restricted filesystem and network access, so `bypassPermissions` is safer by construction
 
 Have an idea? [Open an issue](https://github.com/DikaVer/opencrons/issues) — contributions are welcome.
 

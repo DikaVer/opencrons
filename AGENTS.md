@@ -94,7 +94,7 @@ Shared logic lives in the `cmd` package as unexported functions so both modes re
 
 ### Key data flows
 
-**First-run setup:** `rootCmd.PersistentPreRunE` checks `platform.IsSetupComplete()` → if false, runs `runSetupWizard()` → detects provider → configures messenger/chat/daemon → copies `.workspace/` to config dir → saves `settings.json`.
+**First-run setup:** `rootCmd.PersistentPreRunE` checks `platform.IsSetupComplete()` → if false, runs `runSetupWizard()` → detects provider → configures messenger/chat/daemon → copies `.workspace-example/` to BaseDir (AGENTS.md + .agents/) → creates provider symlinks → saves `settings.json`.
 
 **Job creation:** `cmd/add.go` → TUI wizard or CLI flags → writes `prompts/<name>.md` + `schedules/<name>.yml`. Duplicate names validated in both paths.
 
@@ -152,14 +152,19 @@ Settings {
 
 ```
 <BaseDir>/
-  ├── schedules/          # One YAML per job
-  ├── prompts/            # One .md per job (prompt content)
-  ├── logs/               # stdout (.json) / stderr (.log) per execution
-  ├── summary/            # Execution summaries (when summary_enabled)
-  ├── workspace/          # AGENTS.md (copied from .workspace/ during setup)
-  ├── data/opencrons.db    # SQLite (WAL mode)
-  ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
-  └── opencrons.pid        # Daemon lock file
+  ├── .agents/              # Canonical agent config (real directory)
+  │   └── skills/           # Schedule skill + plugin skills
+  ├── .claude/ → .agents/   # Provider symlink (created for Anthropic)
+  ├── AGENTS.md             # Canonical agent instructions (real file)
+  ├── CLAUDE.md → AGENTS.md # Provider symlink (created for Anthropic)
+  ├── schedules/            # One YAML per job
+  ├── prompts/              # One .md per job (prompt content)
+  ├── logs/                 # stdout (.json) / stderr (.log) per execution
+  ├── summary/              # Execution summaries (when summary_enabled)
+  ├── projects/<job_name>/  # Per-job workspace data (created lazily)
+  ├── data/opencrons.db     # SQLite (WAL mode)
+  ├── settings.json         # All settings (debug, provider, messenger, chat, daemon)
+  └── opencrons.pid         # Daemon lock file
 ```
 
 ### Telegram bot architecture
