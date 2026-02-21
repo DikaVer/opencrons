@@ -170,7 +170,7 @@ func RunDaemonModeSettings() (string, error) {
 				Options(
 					huh.NewOption("💻 Background process", "background"),
 					huh.NewOption("🖥️  System service", "service"),
-					huh.NewOption("◀️  Back", ""),
+					huh.NewOption("◀️  Back", "__back__"),
 				).
 				Value(&mode),
 		),
@@ -181,6 +181,9 @@ func RunDaemonModeSettings() (string, error) {
 			return "", nil
 		}
 		return "", err
+	}
+	if mode == "__back__" {
+		return "", nil
 	}
 
 	return mode, nil

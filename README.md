@@ -330,7 +330,9 @@ OpenCron is focused on Claude Code today, but the vision is broader.
 
 ### 🔜 Coming soon
 
-- 🤖 **Codex CLI support** — run OpenAI's Codex CLI alongside Claude Code jobs
+- 🧠 **Anthropic API** — run jobs directly with [Anthropic API](https://docs.anthropic.com/en/docs/build-with-claude/overview) without requiring Claude Code installed — lower overhead, API key auth, usage-based billing
+- 🤖 **OpenAI API** — first-class support for the [OpenAI API](https://platform.openai.com/docs/overview) — same scheduling, same TUI, same logs, different provider
+- ⌨️ **Codex CLI support** — run OpenAI's [Codex CLI](https://github.com/openai/codex) alongside Claude Code jobs
 - 🔌 **Plugin system** — interactive, controllable integrations:
 
 | Plugin | What it does |
@@ -347,6 +349,7 @@ OpenCron is focused on Claude Code today, but the vision is broader.
 - 🔗 Job chaining — pipe output from one job into the next
 - 🏷️ Job tags and filtering
 - 📱 Push notifications (beyond Telegram)
+- 🔀 **Multi-provider jobs** — run the same prompt against Claude and GPT in parallel, compare results
 
 Have an idea? [Open an issue](https://github.com/DikaVer/opencron/issues) — contributions are welcome.
 

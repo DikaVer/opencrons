@@ -55,7 +55,6 @@ func RunSetupWizard() (*SetupResult, error) {
 				Options(
 					huh.NewOption("🤖 Anthropic (Claude Code)", "anthropic"),
 				).
-				Height(5).
 				Value(&providerID),
 		),
 	).WithTheme(theme)
@@ -96,9 +95,8 @@ func RunSetupWizard() (*SetupResult, error) {
 				Description("Connect a messenger to chat with Claude and manage jobs remotely.").
 				Options(
 					huh.NewOption("📱 Telegram", "telegram"),
-					huh.NewOption("⏭️  Skip (TUI only)", ""),
+					huh.NewOption("⏭️  Skip (TUI only)", "skip"),
 				).
-				Height(6).
 				Value(&messengerType),
 		),
 	).WithTheme(theme)
@@ -149,7 +147,6 @@ func RunSetupWizard() (*SetupResult, error) {
 					huh.NewOption("💻 Background process", "background"),
 					huh.NewOption("🖥️  System service (auto-start on boot)", "service"),
 				).
-				Height(6).
 				Value(&daemonMode),
 		),
 	).WithTheme(theme)
