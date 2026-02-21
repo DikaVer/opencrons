@@ -48,11 +48,18 @@ func handleDaemonMenu() {
 
 	switch choice {
 	case "start":
-		fmt.Println("  Starting OpenCron daemon... (press Ctrl+C to stop)")
-		fmt.Println()
-		if err := daemon.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "  Daemon error: %v\n", err)
+		if pid, running := platform.CheckDaemonRunning(); running {
+			fmt.Fprintf(os.Stderr, "  Daemon already running (PID %d)\n", pid)
+			tui.PrintPressEnter()
+			return
 		}
+		pid, err := daemon.RunBackground()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Error starting daemon: %v\n", err)
+		} else {
+			fmt.Printf("  Daemon started in background (PID %d)\n", pid)
+		}
+		tui.PrintPressEnter()
 	case "stop":
 		runStop(nil, nil)
 	case "install":

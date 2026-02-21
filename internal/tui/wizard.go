@@ -190,8 +190,7 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&timeout),
 		huh.NewConfirm().
 			Title("📊 Enable Report Summarization").
-			Description(fmt.Sprintf("When enabled, Claude generates a short Telegram-style summary after each run.\n"+
-				"Summaries are saved to: %s\nNote: Write tool will be automatically allowed.", platform.SummaryDir())).
+			Description("When enabled, Claude generates a short Telegram-style summary after each run.").
 			Value(&summaryEnabled),
 	)
 
