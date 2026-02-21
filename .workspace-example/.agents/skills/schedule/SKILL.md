@@ -351,7 +351,7 @@ Respond with JSON:
 | `effort` | `--effort` | `--effort` | low/medium/high/max |
 | `timeout` | `--timeout` | `context.WithTimeout` | Kills process on exceed |
 | `no_session_persistence` | — (always true) | `--no-session-persistence` | Hardcoded |
-| `summary_enabled` | `--summary` | Prompt injection | Appends summary directive |
+| `summary_enabled` | `--summary` | Prompt injection |
 | `disallowed_tools` | `--disallowed-tools` | `--disallowed-tools` | Repeatable, restricts tool access |
 | — | — | `--permission-mode bypassPermissions` | Always hardcoded |
 | — | — | `--output-format json` | Always hardcoded |
