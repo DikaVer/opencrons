@@ -241,11 +241,6 @@ func RunAddWizard() (*WizardResult, error) {
 		effortVal = ""
 	}
 
-	// Summary requires Write tool — ensure it's allowed
-	if summaryEnabled {
-		allowedTools = ensureAllowed(allowedTools, "Write")
-	}
-
 	// Build job config
 	job := &config.JobConfig{
 		ID:               uuid.New().String()[:8],
@@ -387,8 +382,8 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Value(&timeout),
 		huh.NewConfirm().
 			Title("📊 Enable Report Summarization").
-			Description(fmt.Sprintf("Generates a short Telegram-style summary after each run.\n"+
-				"Summaries saved to: %s\nNote: Write tool will be automatically allowed.", platform.SummaryDir())).
+			Description("Generates a short Telegram-style summary after each run.\n"+
+				"Summary is sent directly to Telegram as the job output.").
 			Value(&summaryEnabled),
 	)
 
@@ -433,11 +428,6 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		effortVal = ""
 	}
 
-	// Summary requires Write tool — ensure it's allowed
-	if summaryEnabled {
-		allowedTools = ensureAllowed(allowedTools, "Write")
-	}
-
 	// Compute disallowed from allowed selection, preserving custom patterns from YAML
 	disallowed := computeDisallowedTools(allowedTools)
 	knownToolNames := make(map[string]bool)
@@ -474,16 +464,6 @@ func parseInt(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return i
-}
-
-// ensureAllowed adds a tool to the allowed list if not already present.
-func ensureAllowed(allowed []string, tool string) []string {
-	for _, t := range allowed {
-		if t == tool {
-			return allowed
-		}
-	}
-	return append(allowed, tool)
 }
 
 // computeDisallowedTools returns the known tools NOT present in the allowed list.

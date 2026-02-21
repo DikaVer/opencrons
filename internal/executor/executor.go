@@ -8,12 +8,14 @@
 package executor
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/DikaVer/opencrons/internal/config"
@@ -180,16 +182,70 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 }
 
 // parseUsage reads the stdout JSON file and extracts usage data into result.
+// Claude Code may output either a single JSON object or NDJSON (one event per
+// line). We try the single-object form first, then fall back to scanning each
+// line so that both formats are handled transparently.
 func parseUsage(stdoutPath string, result *Result) {
-	data, err := os.ReadFile(stdoutPath)
-	if err != nil || len(data) == 0 {
+	f, err := os.Open(stdoutPath)
+	if err != nil {
+		logger.Debug("parseUsage: cannot open %s: %v", stdoutPath, err)
+		return
+	}
+	defer f.Close()
+
+	var output claudeOutput
+	parsed := false
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1 MiB line buffer
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if len(lines) == 0 {
+		logger.Debug("parseUsage: stdout file is empty: %s", stdoutPath)
 		return
 	}
 
-	var output claudeOutput
-	if err := json.Unmarshal(data, &output); err != nil {
+	// Single JSON object (legacy): try the whole file joined back together.
+	raw := strings.Join(lines, "\n")
+	if err := json.Unmarshal([]byte(raw), &output); err == nil {
+		parsed = true
+	}
+
+	// NDJSON: scan from the last line backwards for a line that has a
+	// non-empty "result" field (the final result event from Claude).
+	if !parsed || output.Result == "" {
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+			var candidate claudeOutput
+			if jsonErr := json.Unmarshal([]byte(line), &candidate); jsonErr == nil {
+				// Prefer a line that has a non-empty result; fall back to
+				// the first parseable line (for cost/token data).
+				if candidate.Result != "" {
+					output = candidate
+					parsed = true
+					break
+				}
+				if !parsed {
+					output = candidate
+					parsed = true
+				}
+			}
+		}
+	}
+
+	if !parsed {
+		logger.Debug("parseUsage: no parseable JSON found in %s", stdoutPath)
 		return
 	}
+
+	logger.Debug("parseUsage: result=%q cost=$%.4f tokens(in=%d out=%d)",
+		output.Result, output.TotalCostUSD, output.Usage.InputTokens, output.Usage.OutputTokens)
 
 	result.Output = output.Result
 	result.CostUSD = output.TotalCostUSD

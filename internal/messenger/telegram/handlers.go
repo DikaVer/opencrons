@@ -317,9 +317,13 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 
 	b.SendPlain(ctx, chatID, fmt.Sprintf("Running job %q...", jobName))
 
-	result, err := executor.Run(ctx, b.db, job, "manual")
+	// Use a background context for execution and result delivery — the
+	// callback handler's ctx may expire during long-running jobs.
+	execCtx := context.Background()
+
+	result, err := executor.Run(execCtx, b.db, job, "manual")
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Execution failed: %v", err))
+		b.SendPlain(execCtx, chatID, fmt.Sprintf("Execution failed: %v", err))
 		return
 	}
 
@@ -330,9 +334,9 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 			msg = fmt.Sprintf("Job %q (%s):\n\n%s", jobName, result.Status, msg)
 		}
 		msg = truncateForTelegram(msg, jobName)
-		if sendErr := b.Send(ctx, chatID, msg); sendErr != nil {
-			if plainErr := b.SendPlain(ctx, chatID, msg); plainErr != nil {
-				b.SendPlain(ctx, chatID, fmt.Sprintf("Job %q completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, result.Status, jobName))
+		if sendErr := b.Send(execCtx, chatID, msg); sendErr != nil {
+			if plainErr := b.SendPlain(execCtx, chatID, msg); plainErr != nil {
+				b.SendPlain(execCtx, chatID, fmt.Sprintf("Job %q completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, result.Status, jobName))
 			}
 		}
 		b.stdlog.Printf("[telegram] Job %q executed: status=%s (output sent)", jobName, result.Status)
@@ -347,7 +351,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		msg += fmt.Sprintf("\nError: %s", result.ErrorMsg)
 	}
 
-	b.SendPlain(ctx, chatID, msg)
+	b.SendPlain(execCtx, chatID, msg)
 	b.stdlog.Printf("[telegram] Job %q executed: status=%s", jobName, result.Status)
 }
 
