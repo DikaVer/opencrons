@@ -2,7 +2,7 @@
 /build/
 *.exe
 
-# Runtime data (created by opencron at ~/.opencron or %APPDATA%\opencron)
+# Runtime data (created by opencrons at ~/.opencrons or %APPDATA%\opencrons)
 # If someone clones this repo INTO their config dir, ignore runtime files
 schedules/
 prompts/*

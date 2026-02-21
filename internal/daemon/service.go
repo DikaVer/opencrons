@@ -12,10 +12,10 @@ import (
 	"github.com/kardianos/service"
 )
 
-// opencronService implements the kardianos/service Interface.
-type opencronService struct{}
+// opencronsService implements the kardianos/service Interface.
+type opencronsService struct{}
 
-func (s *opencronService) Start(_ service.Service) error {
+func (s *opencronsService) Start(_ service.Service) error {
 	go func() {
 		if err := Run(); err != nil {
 			log.Printf("Daemon error: %v", err)
@@ -25,7 +25,7 @@ func (s *opencronService) Start(_ service.Service) error {
 	return nil
 }
 
-func (s *opencronService) Stop(_ service.Service) error {
+func (s *opencronsService) Stop(_ service.Service) error {
 	// Daemon handles shutdown via signal
 	p, _ := os.FindProcess(os.Getpid())
 	p.Signal(os.Interrupt)
@@ -40,14 +40,14 @@ func InstallService() error {
 	}
 
 	svcConfig := &service.Config{
-		Name:        "opencron",
+		Name:        "opencrons",
 		DisplayName: "OpenCron",
 		Description: "OpenCron daemon for Claude Code automation jobs",
 		Arguments:   []string{"start"},
 		Executable:  execPath,
 	}
 
-	svc, err := service.New(&opencronService{}, svcConfig)
+	svc, err := service.New(&opencronsService{}, svcConfig)
 	if err != nil {
 		return fmt.Errorf("creating service: %w", err)
 	}
@@ -57,17 +57,17 @@ func InstallService() error {
 	}
 
 	fmt.Println("Service installed successfully.")
-	fmt.Println("Start it with: opencron start (or via system service manager)")
+	fmt.Println("Start it with: opencrons start (or via system service manager)")
 	return nil
 }
 
 // UninstallService removes the system service.
 func UninstallService() error {
 	svcConfig := &service.Config{
-		Name: "opencron",
+		Name: "opencrons",
 	}
 
-	svc, err := service.New(&opencronService{}, svcConfig)
+	svc, err := service.New(&opencronsService{}, svcConfig)
 	if err != nil {
 		return fmt.Errorf("creating service: %w", err)
 	}

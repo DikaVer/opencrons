@@ -5,7 +5,7 @@ user-invocable: true
 argument-hint: [add|list|edit|run|enable|disable|remove|logs|status]
 ---
 
-You help the user manage opencron jobs. This is the RECOMMENDED way to create jobs because you guide the user through writing high-quality, production-ready prompts.
+You help the user manage opencrons jobs. This is the RECOMMENDED way to create jobs because you guide the user through writing high-quality, production-ready prompts.
 
 ## Commands
 
@@ -199,13 +199,13 @@ To enable Telegram notifications, set these environment variables:
 ### Phase 4: Save Everything
 
 **First**, write the prompt to the prompts directory:
-- **Linux/macOS:** `~/.opencron/prompts/<job-name>.md`
-- **Windows:** `%APPDATA%\opencron\prompts\<job-name>.md`
+- **Linux/macOS:** `~/.opencrons/prompts/<job-name>.md`
+- **Windows:** `%APPDATA%\opencrons\prompts\<job-name>.md`
 
-**Then**, call `opencron add --non-interactive` with all parameters:
+**Then**, call `opencrons add --non-interactive` with all parameters:
 
 ```bash
-opencron add --non-interactive \
+opencrons add --non-interactive \
   --name "job-name" \
   --schedule "0 2 * * *" \
   --prompt-file "job-name.md" \
@@ -291,7 +291,7 @@ Respond with JSON:
 
 ---
 
-## Complete Flag Reference (`opencron add --non-interactive`)
+## Complete Flag Reference (`opencrons add --non-interactive`)
 
 ### Required flags
 
@@ -360,38 +360,38 @@ Respond with JSON:
 
 ## Other Commands
 
-### Edit: `opencron edit <name>`
+### Edit: `opencrons edit <name>`
 Opens the interactive edit wizard. Or edit files directly:
-- YAML: `~/.opencron/schedules/<name>.yml` (Linux/macOS) or `%APPDATA%\opencron\schedules\<name>.yml` (Windows)
-- Prompt: `~/.opencron/prompts/<name>.md` (Linux/macOS) or `%APPDATA%\opencron\prompts\<name>.md` (Windows)
+- YAML: `~/.opencrons/schedules/<name>.yml` (Linux/macOS) or `%APPDATA%\opencrons\schedules\<name>.yml` (Windows)
+- Prompt: `~/.opencrons/prompts/<name>.md` (Linux/macOS) or `%APPDATA%\opencrons\prompts\<name>.md` (Windows)
 
 The daemon hot-reloads YAML changes automatically (500ms debounce).
 
 ### Enable/Disable
 ```bash
-opencron disable <name>   # Pauses job (keeps config, daemon skips it)
-opencron enable <name>    # Resumes running on schedule
+opencrons disable <name>   # Pauses job (keeps config, daemon skips it)
+opencrons enable <name>    # Resumes running on schedule
 ```
 
-### List: `opencron list`
+### List: `opencrons list`
 Shows all jobs with name, schedule, model, effort, and enabled/disabled status.
 
-### Run: `opencron run <name>`
+### Run: `opencrons run <name>`
 Execute immediately (bypass schedule). Shows status, duration, exit code, cost, and token breakdown.
 
-### Remove: `opencron remove <name>`
+### Remove: `opencrons remove <name>`
 Deletes the job config YAML and its prompt file.
 - `-f` / `--force`: skip confirmation prompt
 - `--keep-prompt`: delete config only, keep the prompt `.md` file
 
-### Logs: `opencron logs [name]`
+### Logs: `opencrons logs [name]`
 View execution history. Shows job name, start time, status, trigger type, cost, and token I/O.
-- `-n` / `--limit`: number of entries to show (default 20). Example: `opencron logs my-job -n 50`
+- `-n` / `--limit`: number of entries to show (default 20). Example: `opencrons logs my-job -n 50`
 
-### Status: `opencron status`
+### Status: `opencrons status`
 Shows daemon running/stopped status and next scheduled run time for each enabled job.
 
-### Validate: `opencron validate`
+### Validate: `opencrons validate`
 Validates all job configs. Reports errors (invalid cron, missing working dir) and warnings (missing prompt file).
 
 ---
@@ -399,10 +399,10 @@ Validates all job configs. Reports errors (invalid cron, missing working dir) an
 ## Daemon
 
 ```bash
-opencron start              # Run in foreground (Ctrl+C to stop)
-opencron start --install    # Install as OS service (requires admin/root)
-opencron stop               # Stop running daemon
-opencron status             # Check daemon + next runs
+opencrons start              # Run in foreground (Ctrl+C to stop)
+opencrons start --install    # Install as OS service (requires admin/root)
+opencrons stop               # Stop running daemon
+opencrons status             # Check daemon + next runs
 ```
 
 ---
@@ -415,9 +415,9 @@ opencron status             # Check daemon + next runs
 | `prompts/` | One .md file per job (prompt content) |
 | `logs/` | stdout (.json) and stderr (.log) per execution |
 | `summary/` | Execution summaries (when enabled) |
-| `data/opencron.db` | SQLite execution log + token usage |
+| `data/opencrons.db` | SQLite execution log + token usage |
 | `settings.json` | All settings (provider, messenger, chat, daemon, debug) |
-| `opencron.pid` | Daemon PID lock file |
+| `opencrons.pid` | Daemon PID lock file |
 
-**Linux/macOS:** `~/.opencron/` (or `$XDG_CONFIG_HOME/opencron/`)
-**Windows:** `%APPDATA%\opencron\`
+**Linux/macOS:** `~/.opencrons/` (or `$XDG_CONFIG_HOME/opencrons/`)
+**Windows:** `%APPDATA%\opencrons\`

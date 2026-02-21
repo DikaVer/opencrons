@@ -1,4 +1,4 @@
-module github.com/DikaVer/opencron
+module github.com/DikaVer/opencrons
 
 go 1.25.0
 

@@ -1,4 +1,4 @@
-# opencron
+# opencrons
 
 OpenCron runs Claude Code (`claude -p`) jobs on cron schedules, with Telegram bot integration for remote chat and job management. Go + Cobra + charmbracelet TUI.
 
@@ -6,7 +6,7 @@ OpenCron runs Claude Code (`claude -p`) jobs on cron schedules, with Telegram bo
 
 ```bash
 # Build & test
-go build -o build/opencron ./cmd/opencron/
+go build -o build/opencrons ./cmd/opencrons/
 go test ./...
 go build ./...          # compile check all packages
 make build              # build with version ldflags
@@ -17,34 +17,34 @@ make tidy               # go mod tidy
 make install-skill      # install Claude skill to ~/.claude/skills/
 
 # Install globally (build + install in one step)
-go install github.com/DikaVer/opencron/cmd/opencron@latest  # any platform
+go install github.com/DikaVer/opencrons/cmd/opencrons@latest  # any platform
 sudo make install                   # Linux/macOS → /usr/local/bin/
-go install ./cmd/opencron/          # Windows → %GOPATH%\bin\
+go install ./cmd/opencrons/          # Windows → %GOPATH%\bin\
 make uninstall                      # Remove from install path
 
 # Global flags
-opencron --verbose/-v   # verbose output (applies to any subcommand)
+opencrons --verbose/-v   # verbose output (applies to any subcommand)
 
 # CLI subcommands
-opencron                # interactive TUI menu
-opencron setup          # run (or re-run) the setup wizard
-opencron settings       # manage provider, messenger, chat, debug settings
-opencron add            # create a new job (interactive wizard)
-opencron list           # list all jobs
-opencron run <name>     # execute a job immediately
-opencron edit <name>    # edit job config (interactive wizard)
-opencron enable <name>  # enable a job
-opencron disable <name> # disable a job
-opencron remove <name>  # delete job + prompt file
-opencron logs [name]    # view execution logs
-opencron start          # start daemon (foreground, includes Telegram bot)
-opencron stop           # stop running daemon
-opencron status         # check daemon status
-opencron validate       # validate all job configs
-opencron debug [on|off] # toggle debug logging
+opencrons                # interactive TUI menu
+opencrons setup          # run (or re-run) the setup wizard
+opencrons settings       # manage provider, messenger, chat, debug settings
+opencrons add            # create a new job (interactive wizard)
+opencrons list           # list all jobs
+opencrons run <name>     # execute a job immediately
+opencrons edit <name>    # edit job config (interactive wizard)
+opencrons enable <name>  # enable a job
+opencrons disable <name> # disable a job
+opencrons remove <name>  # delete job + prompt file
+opencrons logs [name]    # view execution logs
+opencrons start          # start daemon (foreground, includes Telegram bot)
+opencrons stop           # stop running daemon
+opencrons status         # check daemon status
+opencrons validate       # validate all job configs
+opencrons debug [on|off] # toggle debug logging
 
 # Non-interactive job creation (all required flags must be set)
-opencron add --non-interactive \
+opencrons add --non-interactive \
   --name "job-name" \
   --schedule "0 2 * * *" \
   --working-dir "/path/to/project" \
@@ -57,10 +57,10 @@ opencron add --non-interactive \
   --disallowed-tools "Bash(git:*)"       # optional, repeatable
 
 # Flags on other commands
-opencron logs [name] -n 50              # --limit/-n: number of entries (default 20)
-opencron remove <name> -f               # --force/-f: skip confirmation
-opencron remove <name> --keep-prompt    # delete config only, keep prompt file
-opencron start --install                # install as OS service
+opencrons logs [name] -n 50              # --limit/-n: number of entries (default 20)
+opencrons remove <name> -f               # --force/-f: skip confirmation
+opencrons remove <name> --keep-prompt    # delete config only, keep prompt file
+opencrons start --install                # install as OS service
 ```
 
 ## Architecture
@@ -68,7 +68,7 @@ opencron start --install                # install as OS service
 ### Package dependency graph
 
 ```
-cmd/opencron/main.go
+cmd/opencrons/main.go
   └→ internal/cmd/              Cobra commands + TUI menu loop
        ├→ internal/config/       JobConfig struct, YAML load/save, prompt file I/O
        ├→ internal/tui/          Interactive UI: menus, wizards, settings, validators (charmbracelet/huh)
@@ -86,9 +86,9 @@ cmd/opencron/main.go
 
 ### Three modes of operation
 
-1. **Interactive TUI** (`opencron` with no args): `root.go:runMainMenu()` loops → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
-2. **CLI subcommands** (`opencron add`, `opencron list`, etc.): Each `internal/cmd/*.go` registers a Cobra command.
-3. **Telegram bot** (inside daemon): Runs alongside cron in `opencron start`. Handles `/new`, `/jobs`, `/model`, `/effort`, `/status`, `/help` commands + free-text chat with Claude.
+1. **Interactive TUI** (`opencrons` with no args): `root.go:runMainMenu()` loops → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
+2. **CLI subcommands** (`opencrons add`, `opencrons list`, etc.): Each `internal/cmd/*.go` registers a Cobra command.
+3. **Telegram bot** (inside daemon): Runs alongside cron in `opencrons start`. Handles `/new`, `/jobs`, `/model`, `/effort`, `/status`, `/help` commands + free-text chat with Claude.
 
 Shared logic lives in the `cmd` package as unexported functions so both modes reuse the same code.
 
@@ -122,7 +122,7 @@ Settings {
 
 - `execution_logs` — job execution records (status, cost, tokens, timestamps)
 - `chat_sessions` — maps Telegram userID → session UUID for `--session-id`
-- `chat_messages` — logged chat messages for visibility (terminal echo, `opencron logs`)
+- `chat_messages` — logged chat messages for visibility (terminal echo, `opencrons logs`)
 
 ### JobConfig fields (config/job.go)
 
@@ -144,9 +144,9 @@ Settings {
 
 | Platform | PID detection | Config path |
 |----------|--------------|-------------|
-| Windows | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\opencron\` |
-| Linux | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencron/` or `$XDG_CONFIG_HOME/opencron/` |
-| macOS | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencron/` |
+| Windows | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\opencrons\` |
+| Linux | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencrons/` or `$XDG_CONFIG_HOME/opencrons/` |
+| macOS | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencrons/` |
 
 ### Runtime config directory
 
@@ -157,14 +157,14 @@ Settings {
   ├── logs/               # stdout (.json) / stderr (.log) per execution
   ├── summary/            # Execution summaries (when summary_enabled)
   ├── workspace/          # AGENTS.md (copied from .workspace/ during setup)
-  ├── data/opencron.db    # SQLite (WAL mode)
+  ├── data/opencrons.db    # SQLite (WAL mode)
   ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
-  └── opencron.pid        # Daemon lock file
+  └── opencrons.pid        # Daemon lock file
 ```
 
 ### Telegram bot architecture
 
-Bot runs inside the daemon (`opencron start`). Single process — no IPC needed.
+Bot runs inside the daemon (`opencrons start`). Single process — no IPC needed.
 
 **Commands:** `/new` (clear session), `/stop` (cancel running query), `/jobs` (inline keyboard job list), `/model` (inline keyboard model picker), `/effort` (inline keyboard effort picker), `/status` (daemon + session info), `/help`
 
@@ -188,7 +188,7 @@ Bot runs inside the daemon (`opencron start`). Single process — no IPC needed.
 - **Embedded files:** `executor/task-preamble.txt` and `executor/summary-prompt.txt` are `//go:embed`-ed — changes require rebuild
 - **Prompt piped via stdin:** Prompt content is passed via stdin (not CLI args) to avoid OS argument length limits and process list exposure
 - **TUI library:** Uses `charmbracelet/huh` for forms and `lipgloss` for styling — Catppuccin Mocha color palette (`#cba6f7` purple, `#a6e3a1` green, `#f38ba8` red, `#fab387` orange, `#6c7086` dim)
-- **Debug logging:** Gated by `settings.json` — only writes to `logs/opencron-debug.log` when `platform.IsDebugEnabled()` returns true
+- **Debug logging:** Gated by `settings.json` — only writes to `logs/opencrons-debug.log` when `platform.IsDebugEnabled()` returns true
 - **Job name validation:** Alphanumeric + hyphens + underscores only
 - **Prompt file security:** Must be relative path, no `..` traversal, no absolute paths
 - **Model validation:** Only allows `sonnet`, `opus`, `haiku` and their full model IDs

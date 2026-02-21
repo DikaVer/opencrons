@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/huh"
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 // MenuAction represents what the user chose from the main menu.
@@ -378,7 +378,7 @@ func RunDebugMenu(debugEnabled bool) (bool, error) {
 	} else {
 		fmt.Printf("  Current state: %s\n", ui.Fail.Render("❌ off"))
 	}
-	fmt.Println(ui.Dim.Render("  When enabled, detailed logs are written to logs/opencron-debug.log"))
+	fmt.Println(ui.Dim.Render("  When enabled, detailed logs are written to logs/opencrons-debug.log"))
 	fmt.Println()
 
 	action := "toggle"

@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DikaVer/opencron/internal/daemon"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/tui"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/daemon"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/tui"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 func handleDebugMenu() {
@@ -29,7 +29,7 @@ func handleDebugMenu() {
 			fmt.Fprintf(os.Stderr, "  Error saving settings: %v\n", err)
 		} else if newState {
 			fmt.Println("  Debug logging enabled.")
-			fmt.Printf("  Logs: %s/opencron-debug.log\n", platform.LogsDir())
+			fmt.Printf("  Logs: %s/opencrons-debug.log\n", platform.LogsDir())
 		} else {
 			fmt.Println("  Debug logging disabled.")
 		}
@@ -69,7 +69,7 @@ func handleDaemonMenu() {
 }
 
 func viewDaemonLogs() {
-	logFile := filepath.Join(platform.LogsDir(), "opencron-debug.log")
+	logFile := filepath.Join(platform.LogsDir(), "opencrons-debug.log")
 
 	data, err := os.ReadFile(logFile)
 	if err != nil {

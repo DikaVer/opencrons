@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencrons/internal/platform"
 	"github.com/spf13/cobra"
 )
 

@@ -1,6 +1,6 @@
-BINARY_NAME=opencron
+BINARY_NAME=opencrons
 BUILD_DIR=./build
-CMD_DIR=./cmd/opencron
+CMD_DIR=./cmd/opencrons
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 PREFIX ?= /usr/local
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION)"

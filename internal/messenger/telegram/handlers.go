@@ -17,10 +17,10 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/executor"
-	"github.com/DikaVer/opencron/internal/logger"
-	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/executor"
+	"github.com/DikaVer/opencrons/internal/logger"
+	"github.com/DikaVer/opencrons/internal/platform"
 )
 
 func (b *Bot) handleStopQuery(ctx context.Context, tgBot *bot.Bot, update *models.Update) {

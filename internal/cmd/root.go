@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/tui"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/tui"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "opencron",
+	Use:   "opencrons",
 	Short: "OpenCron — Claude Code automation scheduler",
 	Long:  "OpenCron runs Claude Code tasks on cron schedules with secure, predefined execution environments.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

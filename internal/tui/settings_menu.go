@@ -11,8 +11,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/huh"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 // SettingsAction represents what the user chose from the settings menu.

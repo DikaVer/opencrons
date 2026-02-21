@@ -4,7 +4,7 @@
 // and other Unix-like systems.
 //
 // The configuration directory is determined by XDG_CONFIG_HOME if set,
-// otherwise it falls back to ~/.opencron.
+// otherwise it falls back to ~/.opencrons.
 package platform
 
 import (
@@ -14,8 +14,8 @@ import (
 
 func defaultBaseDir() string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "opencron")
+		return filepath.Join(xdg, "opencrons")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".opencron")
+	return filepath.Join(home, ".opencrons")
 }

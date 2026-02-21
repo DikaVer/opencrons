@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 // JobConfig represents a single scheduled job configuration.

@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(jobs) == 0 {
-		fmt.Println("No jobs configured. Use 'opencron add' to create one.")
+		fmt.Println("No jobs configured. Use 'opencrons add' to create one.")
 		return nil
 	}
 

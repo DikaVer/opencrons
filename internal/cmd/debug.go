@@ -6,8 +6,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ func runDebug(cmd *cobra.Command, args []string) error {
 		} else {
 			fmt.Printf("  Debug logging: %s\n", ui.Fail.Render("off"))
 		}
-		fmt.Println(ui.Dim.Render("  Use 'opencron debug on' or 'opencron debug off' to toggle."))
+		fmt.Println(ui.Dim.Render("  Use 'opencrons debug on' or 'opencrons debug off' to toggle."))
 		return nil
 	}
 
@@ -41,7 +41,7 @@ func runDebug(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("saving settings: %w", err)
 		}
 		fmt.Printf("  Debug logging: %s\n", ui.Success.Render("on"))
-		fmt.Printf("  Logs: %s\n", ui.Dim.Render(platform.LogsDir()+"/opencron-debug.log"))
+		fmt.Printf("  Logs: %s\n", ui.Dim.Render(platform.LogsDir()+"/opencrons-debug.log"))
 	case "off":
 		if err := platform.SetDebug(false); err != nil {
 			return fmt.Errorf("saving settings: %w", err)

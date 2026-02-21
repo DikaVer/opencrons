@@ -17,9 +17,9 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/DikaVer/opencron/internal/chat"
-	"github.com/DikaVer/opencron/internal/logger"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/chat"
+	"github.com/DikaVer/opencrons/internal/logger"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 // SetChatComponents injects the session manager and runner into the bot.

@@ -90,31 +90,31 @@ The goal: a prompt that works reliably on its own at 3 AM with nobody watching.
 
 ## OpenCron CLI Reference
 
-This section is your complete reference for every `opencron` command. Use it to help users run the right command with the right flags.
+This section is your complete reference for every `opencrons` command. Use it to help users run the right command with the right flags.
 
 ### Running the daemon
 
 The daemon is the cron scheduler that actually runs jobs on schedule. It also runs the Telegram bot if configured.
 
 ```bash
-opencron start              # start daemon in foreground (Ctrl+C to stop)
-opencron start --install    # install as OS service (requires admin/root)
-opencron stop               # stop running daemon (graceful shutdown, 10s timeout)
-opencron status             # show daemon status (running/stopped, PID, next scheduled runs)
+opencrons start              # start daemon in foreground (Ctrl+C to stop)
+opencrons start --install    # install as OS service (requires admin/root)
+opencrons stop               # stop running daemon (graceful shutdown, 10s timeout)
+opencrons status             # show daemon status (running/stopped, PID, next scheduled runs)
 ```
 
-**Important:** The daemon must be running for scheduled jobs to execute. `opencron start` runs in the foreground — use `--install` or a process manager for production.
+**Important:** The daemon must be running for scheduled jobs to execute. `opencrons start` runs in the foreground — use `--install` or a process manager for production.
 
 ### Creating jobs
 
 **Interactive (recommended for guided prompt writing):**
 ```bash
-opencron add                # opens TUI wizard
+opencrons add                # opens TUI wizard
 ```
 
 **Non-interactive (for scripting or when you know exactly what you want):**
 ```bash
-opencron add --non-interactive \
+opencrons add --non-interactive \
   --name "job-name" \
   --schedule "0 2 * * *" \
   --working-dir "/path/to/project" \
@@ -142,58 +142,58 @@ opencron add --non-interactive \
 | `--disallowed-tools` | No | — | Tools to deny (repeatable flag) |
 
 **Prompt file location:**
-- Linux/macOS: `~/.opencron/prompts/<name>.md`
-- Windows: `%APPDATA%\opencron\prompts\<name>.md`
+- Linux/macOS: `~/.opencrons/prompts/<name>.md`
+- Windows: `%APPDATA%\opencrons\prompts\<name>.md`
 
-**When creating jobs for users:** Always write the prompt file first, then run `opencron add --non-interactive`. If `--prompt-content` is provided, the command writes it automatically.
+**When creating jobs for users:** Always write the prompt file first, then run `opencrons add --non-interactive`. If `--prompt-content` is provided, the command writes it automatically.
 
 ### Managing jobs
 
 ```bash
-opencron list               # table: name, schedule, model, effort, status
-opencron enable <name>      # enable a disabled job
-opencron disable <name>     # disable (keeps config, daemon skips it)
-opencron edit <name>        # opens interactive edit wizard
-opencron validate           # validate all job configs (reports errors + warnings)
+opencrons list               # table: name, schedule, model, effort, status
+opencrons enable <name>      # enable a disabled job
+opencrons disable <name>     # disable (keeps config, daemon skips it)
+opencrons edit <name>        # opens interactive edit wizard
+opencrons validate           # validate all job configs (reports errors + warnings)
 ```
 
-**Direct file editing (alternative to `opencron edit`):**
-- YAML config: `~/.opencron/schedules/<name>.yml` (or `%APPDATA%\opencron\schedules\<name>.yml`)
-- Prompt: `~/.opencron/prompts/<name>.md` (or `%APPDATA%\opencron\prompts\<name>.md`)
+**Direct file editing (alternative to `opencrons edit`):**
+- YAML config: `~/.opencrons/schedules/<name>.yml` (or `%APPDATA%\opencrons\schedules\<name>.yml`)
+- Prompt: `~/.opencrons/prompts/<name>.md` (or `%APPDATA%\opencrons\prompts\<name>.md`)
 - The daemon hot-reloads YAML changes automatically (500ms debounce)
 
 ### Running and monitoring
 
 ```bash
-opencron run <name>                 # execute immediately (shows status, duration, cost, tokens)
-opencron logs                       # last 20 logs from all jobs
-opencron logs <name>                # last 20 logs for a specific job
-opencron logs <name> -n 50          # last 50 logs (--limit/-n, default 20)
+opencrons run <name>                 # execute immediately (shows status, duration, cost, tokens)
+opencrons logs                       # last 20 logs from all jobs
+opencrons logs <name>                # last 20 logs for a specific job
+opencrons logs <name> -n 50          # last 50 logs (--limit/-n, default 20)
 ```
 
 ### Removing jobs
 
 ```bash
-opencron remove <name>              # interactive confirmation
-opencron remove <name> -f           # skip confirmation (--force/-f)
-opencron remove <name> --keep-prompt  # delete config only, keep prompt file
-opencron remove <name> -f --keep-prompt  # both flags combined
+opencrons remove <name>              # interactive confirmation
+opencrons remove <name> -f           # skip confirmation (--force/-f)
+opencrons remove <name> --keep-prompt  # delete config only, keep prompt file
+opencrons remove <name> -f --keep-prompt  # both flags combined
 ```
 
 ### Debugging
 
 ```bash
-opencron debug                      # show current debug state
-opencron debug on                   # enable debug logging → logs/opencron-debug.log
-opencron debug off                  # disable debug logging
-opencron --verbose/-v <subcommand>  # verbose output for any command
+opencrons debug                      # show current debug state
+opencrons debug on                   # enable debug logging → logs/opencrons-debug.log
+opencrons debug off                  # disable debug logging
+opencrons --verbose/-v <subcommand>  # verbose output for any command
 ```
 
 ### Setup and settings
 
 ```bash
-opencron setup                      # run (or re-run) the setup wizard
-opencron settings                   # interactive settings menu (provider, messenger, chat, daemon)
+opencrons setup                      # run (or re-run) the setup wizard
+opencrons settings                   # interactive settings menu (provider, messenger, chat, daemon)
 ```
 
 ### Cron schedule quick reference
@@ -216,7 +216,7 @@ opencron settings                   # interactive settings menu (provider, messe
 
 ### How jobs execute under the hood
 
-When the daemon triggers a job (or `opencron run` is used):
+When the daemon triggers a job (or `opencrons run` is used):
 1. `executor.Run()` → `context.WithTimeout` (job's timeout setting)
 2. `BuildCommand()` reads the prompt file, prepends embedded `task-preamble.txt`, optionally appends `summary-prompt.txt`
 3. Full prompt is piped via **stdin** to `claude -p` (not CLI args — avoids OS length limits)
@@ -235,10 +235,10 @@ When the daemon triggers a job (or `opencron run` is used):
 | `prompts/` | One `.md` file per job (prompt content) |
 | `logs/` | stdout (`.json`) and stderr (`.log`) per execution |
 | `summary/` | Execution summaries (when `--summary` enabled) |
-| `data/opencron.db` | SQLite execution log + token usage |
+| `data/opencrons.db` | SQLite execution log + token usage |
 | `settings.json` | All settings (provider, messenger, chat, daemon, debug) |
-| `opencron.pid` | Daemon PID lock file |
+| `opencrons.pid` | Daemon PID lock file |
 
 **Config base directory:**
-- Linux/macOS: `~/.opencron/` (or `$XDG_CONFIG_HOME/opencron/`)
-- Windows: `%APPDATA%\opencron\`
+- Linux/macOS: `~/.opencrons/` (or `$XDG_CONFIG_HOME/opencrons/`)
+- Windows: `%APPDATA%\opencrons\`

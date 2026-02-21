@@ -9,10 +9,10 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/executor"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/storage"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/executor"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/storage"
 	"github.com/spf13/cobra"
 )
 

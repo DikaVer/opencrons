@@ -10,12 +10,12 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/executor"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/storage"
-	"github.com/DikaVer/opencron/internal/tui"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/executor"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/storage"
+	"github.com/DikaVer/opencrons/internal/tui"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 func handleManageJobs() {

@@ -1,7 +1,7 @@
-<h1>🟪🟩 OpenCron — Automated AI Scheduler</h1>
+<h1>🟪🟩 OpenCrons — Automated AI Scheduler</h1>
 
 <div align="center">
-  <img src="public/header.png" alt="OpenCron" width="500">
+  <img src="public/header.png" alt="OpenCrons" width="500">
   <br><br>
   <p>
     Automate Claude Code on a schedule.<br>
@@ -9,14 +9,14 @@
     Manage everything from a beautiful TUI.
   </p>
 
-  <a href="https://github.com/DikaVer/opencron/actions"><img src="https://img.shields.io/github/actions/workflow/status/DikaVer/opencron/ci.yml?style=flat-square&label=build" alt="Build"></a>
-  <a href="https://github.com/DikaVer/opencron/releases"><img src="https://img.shields.io/github/v/release/DikaVer/opencron?style=flat-square&color=a6e3a1&label=release" alt="Release"></a>
-  <a href="https://github.com/DikaVer/opencron/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DikaVer/opencron?style=flat-square&color=cba6f7" alt="License"></a>
-  <a href="https://github.com/DikaVer/opencron"><img src="https://img.shields.io/github/go-mod/go-version/DikaVer/opencron?style=flat-square&color=89b4fa" alt="Go Version"></a>
+  <a href="https://github.com/DikaVer/opencrons/actions"><img src="https://img.shields.io/github/actions/workflow/status/DikaVer/opencrons/ci.yml?style=flat-square&label=build" alt="Build"></a>
+  <a href="https://github.com/DikaVer/opencrons/releases"><img src="https://img.shields.io/github/v/release/DikaVer/opencrons?style=flat-square&color=a6e3a1&label=release" alt="Release"></a>
+  <a href="https://github.com/DikaVer/opencrons/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DikaVer/opencrons?style=flat-square&color=cba6f7" alt="License"></a>
+  <a href="https://github.com/DikaVer/opencrons"><img src="https://img.shields.io/github/go-mod/go-version/DikaVer/opencrons?style=flat-square&color=89b4fa" alt="Go Version"></a>
 </div>
 
 <p align="center">
-  <a href="#-why-opencron">Why OpenCron</a> ·
+  <a href="#-why-opencrons">Why OpenCrons</a> ·
   <a href="#-install">Install</a> ·
   <a href="#%EF%B8%8F-how-it-works">How it works</a> ·
   <a href="#-quick-start">Quick start</a> ·
@@ -29,13 +29,13 @@
 
 ---
 
-OpenCron is an open-source scheduler that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude -p`) jobs on cron schedules. It pairs a terminal-native TUI with a Telegram bot — so you can define, monitor, and chat with your AI jobs from anywhere.
+OpenCrons is an open-source scheduler that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude -p`) jobs on cron schedules. It pairs a terminal-native TUI with a Telegram bot — so you can define, monitor, and chat with your AI jobs from anywhere. Built for developers, researchers, and teams who want structured, repeatable AI automation.
 
 **Built with** Go · Cobra · Charmbracelet · SQLite · Catppuccin Mocha
 
 ---
 
-<h2><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> Why OpenCron 💡<h2>
+<h2><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> Why OpenCrons 💡<h2>
 
 ### The OAuth lockdown changed the game
 
@@ -46,22 +46,22 @@ In January 2026, [Anthropic deployed server-side restrictions](https://winbuzzer
 
 But here's the thing — **`claude -p` is Claude Code**. It's Anthropic's own CLI, running with your own subscription, exactly as intended. No OAuth hijacking, no third-party token routing, no terms of service violations. Just Claude Code doing what Claude Code was built to do.
 
-OpenCron wraps `claude -p` in a structured scheduler. Every job is a direct invocation of Claude Code — the same binary, the same auth, the same process you'd run by hand in your terminal. Nothing in between.
+OpenCrons wraps `claude -p` in a structured scheduler. Every job is a direct invocation of Claude Code — the same binary, the same auth, the same process you'd run by hand in your terminal. Nothing in between.
 
 ### OpenClaw is great, but cron deserves better
 
 [OpenClaw](https://openclaw.ai/) is a fantastic personal AI assistant — WhatsApp, Telegram, iMessage, 500+ integrations. But for many developers, [80–90% of what they actually use it for is cron jobs](https://docs.openclaw.ai/automation/cron-jobs): daily code reviews, morning briefings, CI monitoring, scheduled cleanups.
 
-OpenCron takes that core use case and gives it the dedicated tooling it deserves:
+OpenCrons takes that core use case and gives it the dedicated tooling it deserves:
 
-| | OpenClaw | OpenCron |
+| | OpenClaw | OpenCrons |
 |---|---|---|
 | 🎯 **Focus** | General-purpose AI assistant | Purpose-built cron scheduler |
 | 👁️ **Visibility** | Jobs buried in a JSON file | Interactive TUI + structured logs |
 | 📊 **Tracking** | Minimal job history | SQLite with cost, tokens, status per run |
 | 🔐 **Auth** | Uses Claude Code OAuth | Uses Claude Code directly — fully compliant |
 
-If you need a Swiss Army knife, use OpenClaw. If you need your cron jobs to **just work** — with clear visibility, cost tracking, and a beautiful interface — that's OpenCron.
+If you need a Swiss Army knife, use OpenClaw. If you need your cron jobs to **just work** — with clear visibility, cost tracking, and a beautiful interface — that's OpenCrons.
 
 ---
 
@@ -70,7 +70,7 @@ If you need a Swiss Army knife, use OpenClaw. If you need your cron jobs to **ju
 Requires [Go 1.25+](https://go.dev/dl/) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 ```bash
-go install github.com/DikaVer/opencron/cmd/opencron@latest
+go install github.com/DikaVer/opencrons/cmd/opencrons@latest
 ```
 
 That's it. The binary lands in `$GOPATH/bin` — already in your PATH if Go is set up correctly.
@@ -79,14 +79,14 @@ That's it. The binary lands in `$GOPATH/bin` — already in your PATH if Go is s
 <summary><strong>🔨 Build from source</strong></summary>
 
 ```bash
-git clone https://github.com/DikaVer/opencron.git
-cd opencron
+git clone https://github.com/DikaVer/opencrons.git
+cd opencrons
 
 # Linux / macOS
 sudo make install
 
 # Windows
-go install ./cmd/opencron/
+go install ./cmd/opencrons/
 ```
 
 </details>
@@ -99,7 +99,7 @@ go install ./cmd/opencron/
 sudo make uninstall
 
 # Windows (PowerShell)
-Remove-Item "$(go env GOPATH)\bin\opencron.exe"
+Remove-Item "$(go env GOPATH)\bin\opencrons.exe"
 ```
 
 </details>
@@ -107,19 +107,19 @@ Remove-Item "$(go env GOPATH)\bin\opencron.exe"
 Verify:
 
 ```bash
-opencron --help
+opencrons --help
 ```
 
 ---
 
 ## ⚙️ How it works
 
-OpenCron has three modes of operation:
+OpenCrons has three modes of operation:
 
 | Mode | What it does |
 |------|-------------|
-| 🖥️ **Interactive TUI** | Run `opencron` with no args. A full-screen menu for creating, editing, and managing jobs. |
-| ⌨️ **CLI commands** | Scriptable subcommands — `opencron add`, `opencron list`, `opencron run`, etc. |
+| 🖥️ **Interactive TUI** | Run `opencrons` with no args. A full-screen menu for creating, editing, and managing jobs. |
+| ⌨️ **CLI commands** | Scriptable subcommands — `opencrons add`, `opencrons list`, `opencrons run`, etc. |
 | 💬 **Telegram bot** | Runs inside the daemon. Chat with Claude, trigger jobs, and get notifications — all from your phone. |
 
 ### The execution flow
@@ -127,7 +127,7 @@ OpenCron has three modes of operation:
 ```
 📝 You define a job
   → ⏰ cron schedule triggers it
-    → 📄 OpenCron reads the prompt file
+    → 📄 OpenCrons reads the prompt file
       → 🚀 pipes it to `claude -p` with your configured model & effort
         → 📊 captures output, cost, and token usage
           → 💾 logs everything to SQLite
@@ -143,7 +143,7 @@ Every job runs as an isolated subprocess with `--permission-mode bypassPermissio
 ### 1. Run the setup wizard
 
 ```bash
-opencron setup
+opencrons setup
 ```
 
 The wizard walks you through:
@@ -155,13 +155,13 @@ The wizard walks you through:
 ### 2. Create your first job
 
 ```bash
-opencron add
+opencrons add
 ```
 
 The interactive wizard asks for a name, cron schedule, working directory, model, and prompt. Or go fully non-interactive:
 
 ```bash
-opencron add --non-interactive \
+opencrons add --non-interactive \
   --name "daily-review" \
   --schedule "0 9 * * *" \
   --working-dir "/path/to/project" \
@@ -172,31 +172,31 @@ opencron add --non-interactive \
 ### 3. Start the daemon
 
 ```bash
-opencron start
+opencrons start
 ```
 
-The daemon runs your cron jobs, watches for config changes (hot-reload), and starts the Telegram bot if configured. Stop it with `opencron stop`.
+The daemon runs your cron jobs, watches for config changes (hot-reload), and starts the Telegram bot if configured. Stop it with `opencrons stop`.
 
 ### 4. Check the logs
 
 ```bash
-opencron logs                    # all jobs
-opencron logs daily-review       # specific job
-opencron logs daily-review -n 50 # specific job, last 50 entries
+opencrons logs                    # all jobs
+opencrons logs daily-review       # specific job
+opencrons logs daily-review -n 50 # specific job, last 50 entries
 ```
 
 ---
 
 ## 💬 Telegram bot
 
-The Telegram integration turns OpenCron into a remote AI assistant you can reach from your pocket.
+The Telegram integration turns OpenCrons into a remote AI assistant you can reach from your pocket.
 
 ### Setup
 
 1. 🤖 Create a bot via [@BotFather](https://t.me/BotFather) on Telegram
-2. 🔧 Run `opencron setup` or `opencron settings` to configure the bot token
+2. 🔧 Run `opencrons setup` or `opencrons settings` to configure the bot token
 3. 🔐 Pair your account:
-   - **Verification code** — OpenCron generates a code, you send it to your bot to prove ownership
+   - **Verification code** — OpenCrons generates a code, you send it to your bot to prove ownership
    - **Allowlist** — manually enter Telegram user IDs or @usernames in settings
 
 ### Bot commands
@@ -220,44 +220,44 @@ Send any text message to chat with Claude directly. Sessions persist across mess
 ### 📋 Job management
 
 ```bash
-opencron add              # create a job (interactive wizard)
-opencron list             # list all jobs
-opencron edit <name>      # edit a job
-opencron remove <name>    # delete a job (--force to skip confirmation)
-opencron enable <name>    # enable a disabled job
-opencron disable <name>   # disable a job
-opencron validate         # validate all job configs
+opencrons add              # create a job (interactive wizard)
+opencrons list             # list all jobs
+opencrons edit <name>      # edit a job
+opencrons remove <name>    # delete a job (--force to skip confirmation)
+opencrons enable <name>    # enable a disabled job
+opencrons disable <name>   # disable a job
+opencrons validate         # validate all job configs
 ```
 
 ### ▶️ Execution
 
 ```bash
-opencron run <name>       # run a job immediately
-opencron logs [name]      # view execution logs (-n to set limit)
+opencrons run <name>       # run a job immediately
+opencrons logs [name]      # view execution logs (-n to set limit)
 ```
 
 ### 🔄 Daemon
 
 ```bash
-opencron start            # start the daemon (foreground)
-opencron start --install  # install as OS service
-opencron stop             # stop the daemon
-opencron status           # check daemon status
+opencrons start            # start the daemon (foreground)
+opencrons start --install  # install as OS service
+opencrons stop             # stop the daemon
+opencrons status           # check daemon status
 ```
 
 ### 🔧 Settings
 
 ```bash
-opencron setup            # first-time setup wizard
-opencron settings         # manage all settings
-opencron debug [on|off]   # toggle debug logging
+opencrons setup            # first-time setup wizard
+opencrons settings         # manage all settings
+opencrons debug [on|off]   # toggle debug logging
 ```
 
 ### 🏳️ Global flags
 
 ```bash
-opencron --verbose        # verbose output (any subcommand)
-opencron --help           # help for any command
+opencrons --verbose        # verbose output (any subcommand)
+opencrons --help           # help for any command
 ```
 
 ---
@@ -283,33 +283,33 @@ Each job is a YAML file in `schedules/` with a corresponding prompt in `prompts/
 
 ### 📂 Directory structure
 
-OpenCron stores its configuration and data in a platform-specific directory:
+OpenCrons stores its configuration and data in a platform-specific directory:
 
 | Platform | Path |
 |----------|------|
-| 🐧 **Linux** | `~/.opencron/` or `$XDG_CONFIG_HOME/opencron/` |
-| 🍎 **macOS** | `~/.opencron/` or `$XDG_CONFIG_HOME/opencron/` |
-| 🪟 **Windows** | `%APPDATA%\opencron\` |
+| 🐧 **Linux** | `~/.opencrons/` or `$XDG_CONFIG_HOME/opencrons/` |
+| 🍎 **macOS** | `~/.opencrons/` or `$XDG_CONFIG_HOME/opencrons/` |
+| 🪟 **Windows** | `%APPDATA%\opencrons\` |
 
 ```
-~/.opencron/
+~/.opencrons/
 ├── schedules/        # job configs (YAML)
 ├── prompts/          # prompt files (Markdown)
 ├── logs/             # execution stdout/stderr
 ├── summary/          # execution summaries
 ├── workspace/        # shared AGENTS.md
-├── data/opencron.db  # SQLite database
+├── data/opencrons.db  # SQLite database
 ├── settings.json     # all settings
-└── opencron.pid      # daemon lock file
+└── opencrons.pid      # daemon lock file
 ```
 
 ### 🤖 Workspace (AGENTS.md)
 
-OpenCron copies a [`workspace/AGENTS.md`](.workspace-example/AGENTS.md) into your config directory during setup. This file is injected into every job as context — it acts as a shared system prompt so Claude understands it's running inside OpenCron.
+OpenCrons copies a [`workspace/AGENTS.md`](.workspace-example/AGENTS.md) into your config directory during setup. This file is injected into every job as context — it acts as a shared system prompt so Claude understands it's running inside OpenCrons.
 
 You can customize it to add project-wide instructions, coding standards, or constraints that apply to all your scheduled jobs.
 
-A ready-to-use example is included in the repo at [`.workspace-example/`](.workspace-example/) — it's copied automatically on first run via `opencron setup`.
+A ready-to-use example is included in the repo at [`.workspace-example/`](.workspace-example/) — it's copied automatically on first run via `opencrons setup`.
 
 ### 🖥️ Platform support
 
@@ -323,7 +323,7 @@ A ready-to-use example is included in the repo at [`.workspace-example/`](.works
 
 ## 🔍 How jobs execute
 
-When a job triggers, OpenCron:
+When a job triggers, OpenCrons:
 
 1. 📄 Reads the prompt file and prepends a [task preamble](internal/executor/task-preamble.txt)
 2. 📎 Optionally appends a [summary prompt](internal/executor/summary-prompt.txt)
@@ -339,7 +339,7 @@ Config changes are picked up automatically — the daemon watches the `schedules
 
 ## 🗺️ Roadmap
 
-OpenCron is focused on Claude Code today, but the vision is broader.
+OpenCrons is focused on Claude Code today, but the vision is broader.
 
 ### 🔜 Coming soon
 
@@ -364,7 +364,7 @@ OpenCron is focused on Claude Code today, but the vision is broader.
 - 📱 Push notifications (beyond Telegram)
 - 🔀 **Multi-provider jobs** — run the same prompt against Claude and GPT in parallel, compare results
 
-Have an idea? [Open an issue](https://github.com/DikaVer/opencron/issues) — contributions are welcome.
+Have an idea? [Open an issue](https://github.com/DikaVer/opencrons/issues) — contributions are welcome.
 
 ---
 
@@ -382,7 +382,7 @@ make clean          # remove build artifacts
 ### Architecture
 
 ```
-cmd/opencron/           → entry point
+cmd/opencrons/           → entry point
 internal/
 ├── cmd/                → Cobra commands + TUI menu
 ├── config/             → job config, YAML I/O, prompt files

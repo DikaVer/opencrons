@@ -17,10 +17,10 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/DikaVer/opencron/internal/chat"
-	"github.com/DikaVer/opencron/internal/logger"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/storage"
+	"github.com/DikaVer/opencrons/internal/chat"
+	"github.com/DikaVer/opencrons/internal/logger"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/storage"
 )
 
 // Bot wraps the Telegram bot with OpenCron integration.

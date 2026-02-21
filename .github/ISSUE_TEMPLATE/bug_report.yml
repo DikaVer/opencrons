@@ -12,7 +12,7 @@ body:
     attributes:
       label: What happened?
       description: A clear description of the bug.
-      placeholder: "When I run `opencron start`, the daemon crashes with..."
+      placeholder: "When I run `opencrons start`, the daemon crashes with..."
     validations:
       required: true
 
@@ -31,9 +31,9 @@ body:
       label: Steps to reproduce
       description: How can we reproduce this?
       placeholder: |
-        1. Run `opencron setup`
-        2. Add a job with `opencron add`
-        3. Start daemon with `opencron start`
+        1. Run `opencrons setup`
+        2. Add a job with `opencrons add`
+        3. Start daemon with `opencrons start`
         4. See error...
     validations:
       required: true
@@ -42,7 +42,7 @@ body:
     id: logs
     attributes:
       label: Logs / error output
-      description: Paste any relevant logs or error messages. Use `opencron debug on` for verbose output.
+      description: Paste any relevant logs or error messages. Use `opencrons debug on` for verbose output.
       render: shell
 
   - type: dropdown
@@ -59,8 +59,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: OpenCron version
-      description: Run `opencron --version` to find out.
+      label: OpenCrons version
+      description: Run `opencrons --version` to find out.
       placeholder: "v0.1.0"
 
   - type: input

@@ -16,14 +16,14 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/DikaVer/opencron/internal/chat"
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/executor"
-	"github.com/DikaVer/opencron/internal/logger"
-	"github.com/DikaVer/opencron/internal/messenger/telegram"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/storage"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/chat"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/executor"
+	"github.com/DikaVer/opencrons/internal/logger"
+	"github.com/DikaVer/opencrons/internal/messenger/telegram"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/storage"
+	"github.com/DikaVer/opencrons/internal/ui"
 	"github.com/robfig/cron/v3"
 )
 
@@ -56,7 +56,7 @@ func (l *cronLogger) Error(err error, msg string, keysAndValues ...interface{}) 
 
 // Run starts the daemon in the foreground.
 func Run() error {
-	stdlog := log.New(os.Stdout, "[opencron] ", log.LstdFlags)
+	stdlog := log.New(os.Stdout, "[opencrons] ", log.LstdFlags)
 	cronLog := &cronLogger{stdlog: stdlog}
 
 	if err := platform.EnsureDirs(); err != nil {

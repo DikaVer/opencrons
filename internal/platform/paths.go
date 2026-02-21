@@ -55,12 +55,12 @@ func DataDir() string {
 
 // DBPath returns the full path to the SQLite database file.
 func DBPath() string {
-	return filepath.Join(DataDir(), "opencron.db")
+	return filepath.Join(DataDir(), "opencrons.db")
 }
 
 // PIDFile returns the path to the PID file.
 func PIDFile() string {
-	return filepath.Join(BaseDir(), "opencron.pid")
+	return filepath.Join(BaseDir(), "opencrons.pid")
 }
 
 // WorkspaceDir returns the path to the workspace directory (CLAUDE.md + .claude/).

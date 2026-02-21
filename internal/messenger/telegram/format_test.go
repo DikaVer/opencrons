@@ -5,9 +5,9 @@ import (
 )
 
 func TestMarkdownToHTML_WindowsPath(t *testing.T) {
-	input := `My working directory is C:\Users\dika1\AppData\Roaming\opencron\workspace`
+	input := `My working directory is C:\Users\dika1\AppData\Roaming\opencrons\workspace`
 	got := markdownToHTML(input)
-	want := `My working directory is C:\Users\dika1\AppData\Roaming\opencron\workspace`
+	want := `My working directory is C:\Users\dika1\AppData\Roaming\opencrons\workspace`
 	if got != want {
 		t.Errorf("backslashes lost:\n got: %s\nwant: %s", got, want)
 	}

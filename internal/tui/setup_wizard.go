@@ -13,10 +13,10 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/DikaVer/opencron/internal/messenger/telegram"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/provider"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/messenger/telegram"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/provider"
+	"github.com/DikaVer/opencrons/internal/ui"
 )
 
 // SetupResult holds the output of the setup wizard.
@@ -193,7 +193,7 @@ func RunSetupWizard() (*SetupResult, error) {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Dim.Render("  Run 'opencron start' to launch the daemon."))
+	fmt.Println(ui.Dim.Render("  Run 'opencrons start' to launch the daemon."))
 	fmt.Println()
 
 	return result, nil

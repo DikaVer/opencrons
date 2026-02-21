@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/DikaVer/opencron/internal/config"
-	"github.com/DikaVer/opencron/internal/platform"
-	"github.com/DikaVer/opencron/internal/ui"
+	"github.com/DikaVer/opencrons/internal/config"
+	"github.com/DikaVer/opencrons/internal/platform"
+	"github.com/DikaVer/opencrons/internal/ui"
 	"github.com/google/uuid"
 )
 
