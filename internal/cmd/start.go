@@ -1,6 +1,8 @@
-// File start.go implements the start daemon command. It supports a --install flag
-// for system service installation and checks whether the daemon is already running
-// before launching.
+// File start.go implements the start daemon command.
+// Default behaviour (no flags): spawns the daemon as a detached background
+// process and returns immediately so the terminal/TUI is not blocked.
+// --foreground: run blocking in the current process (for service managers).
+// --install: register as an OS service instead of starting directly.
 package cmd
 
 import (
@@ -20,7 +22,7 @@ var startCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(startCmd)
 	startCmd.Flags().Bool("install", false, "install as system service")
-	startCmd.Flags().Bool("foreground", false, "run in foreground (default)")
+	startCmd.Flags().Bool("foreground", false, "run in foreground (blocks until stopped)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -29,16 +31,26 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	install, _ := cmd.Flags().GetBool("install")
-
 	if install {
 		return daemon.InstallService()
 	}
 
-	// Check if already running
+	// Check if already running before doing anything else.
 	if pid, running := platform.CheckDaemonRunning(); running {
 		return fmt.Errorf("daemon already running (PID %d)", pid)
 	}
 
-	fmt.Println("Starting OpenCron daemon...")
-	return daemon.Run()
+	foreground, _ := cmd.Flags().GetBool("foreground")
+	if foreground {
+		fmt.Println("Starting OpenCron daemon (foreground)...")
+		return daemon.Run()
+	}
+
+	// Default: spawn detached background process and return.
+	pid, err := daemon.RunBackground()
+	if err != nil {
+		return fmt.Errorf("starting daemon in background: %w", err)
+	}
+	fmt.Printf("Daemon started in background (PID %d)\n", pid)
+	return nil
 }
