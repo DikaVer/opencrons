@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/huh"
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/ui"
 )
 
 // MenuAction represents what the user chose from the main menu.
@@ -45,18 +45,25 @@ const (
 	JobActionBack
 )
 
-// RunMainMenu shows the main TUI menu and returns the selected action.
-func RunMainMenu() (MenuAction, error) {
+// PrintHeader renders the app header with status bar and an optional page title.
+// If page is empty, no breadcrumb is shown (main menu mode).
+func PrintHeader(page string) {
 	ClearScreen()
-
-	// Show header
 	fmt.Println()
 	fmt.Println(ui.Title.Render("  🚀 OpenCron — Claude Code Automation"))
 	fmt.Println(ui.Dim.Render("  Schedule and manage automated Claude Code tasks"))
 	fmt.Println()
-
-	// Show quick status
 	printQuickStatus()
+	if page != "" {
+		fmt.Println()
+		fmt.Println(ui.Title.Render("  " + page))
+		fmt.Println()
+	}
+}
+
+// RunMainMenu shows the main TUI menu and returns the selected action.
+func RunMainMenu() (MenuAction, error) {
+	PrintHeader("")
 	fmt.Println()
 
 	var choice int
@@ -92,7 +99,7 @@ func RunMainMenu() (MenuAction, error) {
 // Returns "__add__" if user chose to add a new job.
 // Returns empty string if user chose back, pressed Escape, or there are no jobs.
 func RunJobPicker(title, description string) (string, error) {
-	ClearScreen()
+	PrintHeader("📂 Manage Jobs")
 
 	jobs, err := config.LoadAllJobs(platform.SchedulesDir())
 	if err != nil {
@@ -137,15 +144,12 @@ func RunJobPicker(title, description string) (string, error) {
 
 // RunJobActionMenu shows actions available for a selected job.
 func RunJobActionMenu(jobName string) (JobAction, error) {
-	ClearScreen()
-
 	job, err := config.FindJobByName(platform.SchedulesDir(), jobName)
 	if err != nil {
 		return JobActionBack, err
 	}
 
-	fmt.Println()
-	fmt.Println(ui.Title.Render(fmt.Sprintf("  📋 Job: %s", job.Name)))
+	PrintHeader(fmt.Sprintf("📋 Job: %s", job.Name))
 	fmt.Printf("  %s %s\n", ui.Dim.Render("⏰ Schedule:"), job.Schedule)
 	fmt.Printf("  %s %s\n", ui.Dim.Render("🧠 Model:"), job.Model)
 	fmt.Printf("  %s %s\n", ui.Dim.Render("📁 Directory:"), job.WorkingDir)
@@ -192,11 +196,7 @@ func RunJobActionMenu(jobName string) (JobAction, error) {
 
 // RunDaemonMenu shows daemon control options.
 func RunDaemonMenu() (string, error) {
-	ClearScreen()
-
-	fmt.Println()
-	fmt.Println(ui.Title.Render("  🤖 Daemon Control"))
-	fmt.Println()
+	PrintHeader("🤖 Daemon Control")
 
 	// Show daemon status
 	pid, running := platform.CheckDaemonRunning()
@@ -254,7 +254,7 @@ func RunDaemonMenu() (string, error) {
 
 // RunLogsPicker lets the user choose which logs to view.
 func RunLogsPicker() (string, error) {
-	ClearScreen()
+	PrintHeader("📜 View Logs")
 
 	jobs, err := config.LoadAllJobs(platform.SchedulesDir())
 	if err != nil {
@@ -371,11 +371,7 @@ func printQuickStatus() {
 
 // RunDebugMenu shows the debug toggle menu.
 func RunDebugMenu(debugEnabled bool) (bool, error) {
-	ClearScreen()
-
-	fmt.Println()
-	fmt.Println(ui.Title.Render("  🐛 Debug Logging"))
-	fmt.Println()
+	PrintHeader("🐛 Debug Logging")
 
 	if debugEnabled {
 		fmt.Printf("  Current state: %s\n", ui.Success.Render("✅ on"))

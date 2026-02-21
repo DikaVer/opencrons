@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/dika-maulidal/opencron/internal/cmd"
+	"github.com/DikaVer/opencron/internal/cmd"
 )
 
 func main() {

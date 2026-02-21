@@ -11,8 +11,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/huh"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/ui"
 )
 
 // SettingsAction represents what the user chose from the settings menu.
@@ -30,13 +30,9 @@ const (
 
 // RunSettingsMenu shows the settings management menu.
 func RunSettingsMenu() (SettingsAction, error) {
-	ClearScreen()
-
 	s := platform.LoadSettings()
 
-	fmt.Println()
-	fmt.Println(ui.Title.Render("  ⚙️  Settings"))
-	fmt.Println()
+	PrintHeader("⚙️  Settings")
 
 	// Show current settings summary
 	providerStr := "not configured"
@@ -107,12 +103,12 @@ func RunSettingsMenu() (SettingsAction, error) {
 
 // RunProviderSettings shows the provider settings view.
 func RunProviderSettings() error {
-	ClearScreen()
+	PrintHeader("🔌 Provider")
 	s := platform.LoadSettings()
 	if s.Provider != nil {
-		fmt.Printf("\n  %s %s\n", ui.Dim.Render("🔌 Current provider:"), s.Provider.ID)
+		fmt.Printf("  %s %s\n", ui.Dim.Render("🔌 Current provider:"), s.Provider.ID)
 	} else {
-		fmt.Printf("\n  %s not configured\n", ui.Dim.Render("🔌 Current provider:"))
+		fmt.Printf("  %s not configured\n", ui.Dim.Render("🔌 Current provider:"))
 	}
 	fmt.Println(ui.Dim.Render("  Only Anthropic (Claude Code) is currently supported."))
 	fmt.Println()
@@ -121,11 +117,10 @@ func RunProviderSettings() error {
 
 // RunMessengerSettings shows messenger settings and allows editing.
 func RunMessengerSettings() (*platform.MessengerSettings, error) {
-	ClearScreen()
+	PrintHeader("💬 Messenger")
 	s := platform.LoadSettings()
 
 	if s.Messenger != nil && s.Messenger.Type != "" {
-		fmt.Println()
 		fmt.Printf("  %s %s\n", ui.Dim.Render("💬 Type:"), s.Messenger.Type)
 		fmt.Printf("  %s %s...%s\n", ui.Dim.Render("🔑 Token:"), s.Messenger.BotToken[:8], s.Messenger.BotToken[len(s.Messenger.BotToken)-4:])
 
@@ -153,13 +148,13 @@ func RunMessengerSettings() (*platform.MessengerSettings, error) {
 
 // RunChatModelSettings lets the user change chat model and effort.
 func RunChatModelSettings() (*platform.ChatSettings, error) {
-	ClearScreen()
+	PrintHeader("🧠 Chat Model")
 	return runChatModelForm()
 }
 
 // RunDaemonModeSettings lets the user change daemon mode.
 func RunDaemonModeSettings() (string, error) {
-	ClearScreen()
+	PrintHeader("🤖 Daemon Mode")
 	s := platform.LoadSettings()
 	current := s.DaemonMode
 	if current == "" {

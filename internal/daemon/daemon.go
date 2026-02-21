@@ -16,14 +16,14 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/dika-maulidal/opencron/internal/chat"
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/executor"
-	"github.com/dika-maulidal/opencron/internal/logger"
-	"github.com/dika-maulidal/opencron/internal/messenger/telegram"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/storage"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/chat"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/executor"
+	"github.com/DikaVer/opencron/internal/logger"
+	"github.com/DikaVer/opencron/internal/messenger/telegram"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/storage"
+	"github.com/DikaVer/opencron/internal/ui"
 	"github.com/robfig/cron/v3"
 )
 

@@ -1,4 +1,4 @@
-module github.com/dika-maulidal/opencron
+module github.com/DikaVer/opencron
 
 go 1.25.0
 
@@ -6,6 +6,7 @@ require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-telegram/bot v1.19.0
 	github.com/google/uuid v1.6.0
 	github.com/kardianos/service v1.2.4
 	github.com/robfig/cron/v3 v3.0.1
@@ -28,7 +29,6 @@ require (
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/go-telegram/bot v1.19.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/logger"
-	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/logger"
+	"github.com/DikaVer/opencron/internal/platform"
 )
 
 //go:embed summary-prompt.txt

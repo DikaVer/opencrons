@@ -5,8 +5,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 

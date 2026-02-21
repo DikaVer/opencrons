@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/tui"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/tui"
+	"github.com/DikaVer/opencron/internal/ui"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )

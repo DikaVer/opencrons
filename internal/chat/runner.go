@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dika-maulidal/opencron/internal/logger"
-	"github.com/dika-maulidal/opencron/internal/storage"
+	"github.com/DikaVer/opencron/internal/logger"
+	"github.com/DikaVer/opencron/internal/storage"
 )
 
 // chatOutput represents the JSON output from claude -p --output-format json.

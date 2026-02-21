@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/storage"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/storage"
 	"github.com/spf13/cobra"
 )
 

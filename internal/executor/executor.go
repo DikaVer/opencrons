@@ -16,10 +16,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dika-maulidal/opencron/internal/config"
-	"github.com/dika-maulidal/opencron/internal/logger"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/storage"
+	"github.com/DikaVer/opencron/internal/config"
+	"github.com/DikaVer/opencron/internal/logger"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/storage"
 )
 
 // claudeOutput represents the JSON output from `claude -p --output-format json`.

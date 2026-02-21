@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/platform"
 )
 
 var (

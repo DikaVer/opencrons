@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/storage"
-	"github.com/dika-maulidal/opencron/internal/tui"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/storage"
+	"github.com/DikaVer/opencron/internal/tui"
+	"github.com/DikaVer/opencron/internal/ui"
 )
 
 func handleViewLogs() {

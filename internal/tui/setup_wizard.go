@@ -13,10 +13,10 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/dika-maulidal/opencron/internal/messenger/telegram"
-	"github.com/dika-maulidal/opencron/internal/platform"
-	"github.com/dika-maulidal/opencron/internal/provider"
-	"github.com/dika-maulidal/opencron/internal/ui"
+	"github.com/DikaVer/opencron/internal/messenger/telegram"
+	"github.com/DikaVer/opencron/internal/platform"
+	"github.com/DikaVer/opencron/internal/provider"
+	"github.com/DikaVer/opencron/internal/ui"
 )
 
 // SetupResult holds the output of the setup wizard.
@@ -27,19 +27,24 @@ type SetupResult struct {
 	DaemonMode string
 }
 
+// printSetupHeader renders a setup-specific header with step number and title.
+// Unlike PrintHeader, it omits the status bar since nothing is configured yet.
+func printSetupHeader(step int, title string) {
+	ClearScreen()
+	fmt.Println()
+	fmt.Println(ui.Title.Render("  🎉 OpenCron — Setup"))
+	fmt.Println(ui.Dim.Render("  Configure your environment to get started"))
+	fmt.Println()
+	fmt.Println(ui.Title.Render(fmt.Sprintf("  Step %d · %s", step, title)))
+	fmt.Println()
+}
+
 // RunSetupWizard runs the first-time setup wizard.
 func RunSetupWizard() (*SetupResult, error) {
-	// Step 1: Welcome
-	fmt.Println()
-	fmt.Println(ui.Title.Render("  🎉 Welcome to OpenCron"))
-	fmt.Println()
-	fmt.Println(ui.Dim.Render("  OpenCron runs Claude Code tasks on cron schedules."))
-	fmt.Println(ui.Dim.Render("  This wizard will help you set up your environment."))
-	fmt.Println()
+	step := 1
 
-	// Step 2: Provider detection
-	fmt.Println(ui.Title.Render("  🔌 Step 1: AI Provider"))
-	fmt.Println()
+	// Step 1: AI Provider
+	printSetupHeader(step, "AI Provider")
 
 	var providerID string
 	providerForm := huh.NewForm(
@@ -50,6 +55,7 @@ func RunSetupWizard() (*SetupResult, error) {
 				Options(
 					huh.NewOption("🤖 Anthropic (Claude Code)", "anthropic"),
 				).
+				Height(5).
 				Value(&providerID),
 		),
 	).WithTheme(theme)
@@ -65,21 +71,22 @@ func RunSetupWizard() (*SetupResult, error) {
 	}
 
 	for !p.Detect() {
-		fmt.Println()
-		fmt.Println(ui.Dim.Render("  ⚠️  Claude Code CLI not found on PATH."))
-		fmt.Println(ui.Dim.Render("  Install it: npm install -g @anthropic-ai/claude-code"))
+		printSetupHeader(step, "AI Provider")
+		fmt.Println(ui.Warn.Render("  ⚠️  Claude Code CLI not found on PATH."))
+		fmt.Println(ui.Warn.Render("  Install it: npm install -g @anthropic-ai/claude-code"))
 		fmt.Println()
 		PrintPressEnter()
 	}
 
-	if version := p.Version(); version != "" {
-		fmt.Printf("  %s %s\n", ui.Dim.Render("✅ Claude Code:"), ui.Success.Render(version))
+	providerVersion := p.Version()
+	if providerVersion != "" {
+		fmt.Printf("  %s %s\n", ui.Dim.Render("✅ Claude Code:"), ui.Success.Render(providerVersion))
 	}
 	fmt.Println()
 
-	// Step 3: Messenger
-	fmt.Println(ui.Title.Render("  💬 Step 2: Messenger Integration"))
-	fmt.Println()
+	// Step 2: Messenger
+	step++
+	printSetupHeader(step, "Messenger Integration")
 
 	var messengerType string
 	messengerForm := huh.NewForm(
@@ -91,6 +98,7 @@ func RunSetupWizard() (*SetupResult, error) {
 					huh.NewOption("📱 Telegram", "telegram"),
 					huh.NewOption("⏭️  Skip (TUI only)", ""),
 				).
+				Height(6).
 				Value(&messengerType),
 		),
 	).WithTheme(theme)
@@ -103,8 +111,9 @@ func RunSetupWizard() (*SetupResult, error) {
 		Provider: providerID,
 	}
 
-	// Step 4: Telegram setup
+	// Telegram setup (sub-step of step 2)
 	if messengerType == "telegram" {
+		printSetupHeader(step, "Telegram — Bot Setup")
 		msgSettings, err := runTelegramSetup()
 		if err != nil {
 			return nil, err
@@ -112,10 +121,9 @@ func RunSetupWizard() (*SetupResult, error) {
 		if msgSettings != nil {
 			result.Messenger = msgSettings
 
-			// Step 5: Chat Model
-			fmt.Println()
-			fmt.Println(ui.Title.Render("  🧠 Step 3: Chat Model"))
-			fmt.Println()
+			// Chat Model step (only if telegram was configured)
+			step++
+			printSetupHeader(step, "Chat Model")
 
 			chatSettings, err := runChatModelForm()
 			if err != nil {
@@ -127,10 +135,9 @@ func RunSetupWizard() (*SetupResult, error) {
 		}
 	}
 
-	// Step 6: Daemon mode
-	fmt.Println()
-	fmt.Println(ui.Title.Render("  🤖 Step 4: Daemon Configuration"))
-	fmt.Println()
+	// Daemon Configuration
+	step++
+	printSetupHeader(step, "Daemon Configuration")
 
 	var daemonMode string
 	daemonForm := huh.NewForm(
@@ -142,6 +149,7 @@ func RunSetupWizard() (*SetupResult, error) {
 					huh.NewOption("💻 Background process", "background"),
 					huh.NewOption("🖥️  System service (auto-start on boot)", "service"),
 				).
+				Height(6).
 				Value(&daemonMode),
 		),
 	).WithTheme(theme)
@@ -151,9 +159,44 @@ func RunSetupWizard() (*SetupResult, error) {
 	}
 	result.DaemonMode = daemonMode
 
-	// Done
+	// Done — completion summary
+	ClearScreen()
 	fmt.Println()
-	fmt.Println(ui.Success.Render("  🎉 Setup complete!"))
+	fmt.Println(ui.Success.Render("  ✅ Setup Complete!"))
+	fmt.Println()
+
+	// Provider
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🔌 Provider: "), ui.Accent.Render(result.Provider))
+
+	// Messenger
+	if result.Messenger != nil && result.Messenger.Type != "" {
+		userCount := len(result.Messenger.AllowedUsers)
+		userLabel := "user"
+		if userCount != 1 {
+			userLabel = "users"
+		}
+		fmt.Printf("  %s %s\n", ui.Dim.Render("💬 Messenger:"), ui.Accent.Render(fmt.Sprintf("%s (%d %s)", result.Messenger.Type, userCount, userLabel)))
+	} else {
+		fmt.Printf("  %s %s\n", ui.Dim.Render("💬 Messenger:"), ui.Dim.Render("skipped"))
+	}
+
+	// Chat model
+	if result.Chat != nil {
+		fmt.Printf("  %s %s\n", ui.Dim.Render("🧠 Chat:     "), ui.Accent.Render(fmt.Sprintf("%s / %s", result.Chat.Model, result.Chat.Effort)))
+	} else {
+		fmt.Printf("  %s %s\n", ui.Dim.Render("🧠 Chat:     "), ui.Dim.Render("n/a"))
+	}
+
+	// Daemon
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🤖 Daemon:   "), ui.Accent.Render(result.DaemonMode))
+
+	// Claude Code version
+	if providerVersion != "" {
+		fmt.Printf("  %s %s\n", ui.Dim.Render("📦 Claude:   "), ui.Accent.Render(providerVersion))
+	}
+
+	fmt.Println()
+	fmt.Println(ui.Dim.Render("  Run 'opencron start' to launch the daemon."))
 	fmt.Println()
 
 	return result, nil
