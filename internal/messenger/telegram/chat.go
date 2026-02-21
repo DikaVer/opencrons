@@ -2,14 +2,16 @@
 //
 // SetChatComponents injects the session manager and runner after bot creation.
 // handleChatMessage acquires a per-user lock, gets or creates a session,
-// sends typing indicators, runs "claude -p --session-id", logs the exchange
-// to the database, sends the response to Telegram, and echoes a summary to
-// the terminal. sendTypingLoop refreshes the typing indicator every 5 seconds.
+// sends typing indicators, runs "claude -p" with --session-id (new) or
+// --resume (existing), logs the exchange to the database, sends the response
+// to Telegram, and echoes a summary to the terminal.
+// sendTypingLoop refreshes the typing indicator every 5 seconds.
 package telegram
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/dika-maulidal/opencron/internal/chat"
 	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/ui"
 )
 
 // SetChatComponents injects the session manager and runner into the bot.
@@ -45,7 +48,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	defer b.unlock(userID)
 
 	// Get or create session
-	session, err := b.sessionMgr.GetOrCreateSession(userID, chatID)
+	session, isNew, err := b.sessionMgr.GetOrCreateSession(userID, chatID)
 	if err != nil {
 		b.SendPlain(ctx, chatID, fmt.Sprintf("Error creating session: %v", err))
 		logger.Debug("Session error for user %d: %v", userID, err)
@@ -65,8 +68,52 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	go b.sendTypingLoop(typingCtx, tgBot, chatID)
 
 	// Run Claude (no timeout — runs until completion or /stop)
-	result, err := b.chatRunner.Run(runCtx, session, text)
+	result, err := b.chatRunner.Run(runCtx, session, text, isNew)
 	typingCancel() // Stop typing indicator
+
+	// If --resume fails because Claude has no transcript on disk (e.g. the
+	// first call in this session errored), fall back to a fresh session.
+	if err != nil && !isNew && strings.Contains(err.Error(), "No conversation found") {
+		logger.Debug("No Claude transcript for session %s, creating fresh session for user %d", session.ID, userID)
+		_ = b.sessionMgr.ClearSession(userID)
+		if newSession, sessErr := b.sessionMgr.CreateSession(userID, chatID); sessErr == nil {
+			session = newSession
+			isNew = true
+			typingCtx2, typingCancel2 := context.WithCancel(runCtx)
+			go b.sendTypingLoop(typingCtx2, tgBot, chatID)
+			result, err = b.chatRunner.Run(runCtx, newSession, text, true)
+			typingCancel2()
+		}
+	}
+
+	// If session lock is stale ("already in use"), wait briefly and retry
+	// to preserve conversation history before falling back to a new session.
+	if err != nil && strings.Contains(err.Error(), "already in use") {
+		logger.Debug("Session %s in use for user %d, retrying after delay", session.ID, userID)
+
+		select {
+		case <-runCtx.Done():
+		case <-time.After(2 * time.Second):
+			typingCtx2, typingCancel2 := context.WithCancel(runCtx)
+			go b.sendTypingLoop(typingCtx2, tgBot, chatID)
+			result, err = b.chatRunner.Run(runCtx, session, text, isNew)
+			typingCancel2()
+		}
+
+		// Still failing — create a fresh session as last resort
+		if err != nil && strings.Contains(err.Error(), "already in use") {
+			logger.Debug("Retry failed, creating fresh session for user %d", userID)
+			_ = b.sessionMgr.ClearSession(userID)
+			if newSession, sessErr := b.sessionMgr.CreateSession(userID, chatID); sessErr == nil {
+				session = newSession
+				isNew = true
+				typingCtx3, typingCancel3 := context.WithCancel(runCtx)
+				go b.sendTypingLoop(typingCtx3, tgBot, chatID)
+				result, err = b.chatRunner.Run(runCtx, newSession, text, true)
+				typingCancel3()
+			}
+		}
+	}
 
 	if err != nil {
 		errMsg := fmt.Sprintf("Error: %v\nTry /new for a fresh session.", err)
@@ -91,14 +138,8 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	if update.Message.From.Username != "" {
 		userName = "@" + update.Message.From.Username
 	}
-	truncatedText := text
-	if len(truncatedText) > 100 {
-		truncatedText = truncatedText[:100] + "..."
-	}
-	truncatedResponse := result.Response
-	if len(truncatedResponse) > 200 {
-		truncatedResponse = truncatedResponse[:200] + "..."
-	}
+	truncatedText := ui.Truncate(text, 100)
+	truncatedResponse := ui.Truncate(result.Response, 200)
 
 	b.stdlog.Printf("[telegram] %s: %s", userName, truncatedText)
 	b.stdlog.Printf("[telegram] Claude ($%.4f, %s): %s", result.CostUSD, result.Duration.Round(time.Millisecond), truncatedResponse)

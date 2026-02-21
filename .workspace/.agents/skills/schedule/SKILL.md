@@ -74,7 +74,7 @@ Structure every prompt using this template:
 - If nothing needs to be done, report "No changes needed" and exit cleanly
 
 ## Output
-[Exact format: JSON schema, markdown template, or file path]
+[Format: plain text, markdown, or JSON — choose what best fits the task. Natural language is preferred unless the output will be machine-parsed.]
 
 ## Error Handling
 - [Specific fallback for each likely failure mode]
@@ -87,7 +87,7 @@ Structure every prompt using this template:
 - **One atomic task per job.** If the description contains "and" connecting unrelated actions, suggest splitting into two jobs.
 - **Explain the "why", not just the "what".** Instead of "never modify test files," say "never modify test files — they serve as the correctness baseline and changes could mask regressions."
 - **Scope aggressively.** Always specify which files/directories are in scope and what the maximum blast radius is.
-- **Specify output format.** Unattended jobs need parseable output for monitoring. Prefer JSON.
+- **Specify output format.** Unattended jobs need clear output for monitoring. Natural language text is fine — use JSON only when the output will be parsed by another system.
 - **Include a Do-NOT list.** Unattended agents need explicit boundaries since there's no human to say "stop."
 
 **Auto-suggest constraints by task type:**
@@ -169,6 +169,31 @@ Based on the task, recommend settings:
 | **Summary** | Enable for jobs where you want a human-readable execution digest. |
 
 Present the config as a summary table and confirm with the user.
+
+### Phase 3b: Telegram Notifications (when summary is enabled)
+
+If the user has `--summary` enabled **and** a Telegram integration is configured, automatically append a Telegram notification step to the prompt:
+
+```markdown
+## Notifications
+After completing all steps, send the summary to Telegram:
+- Read the Telegram bot token from environment variable `TELEGRAM_BOT_TOKEN`
+- Read the chat ID from environment variable `TELEGRAM_CHAT_ID`
+- Send the summary as a message using the Telegram Bot API:
+  POST https://api.telegram.org/bot{TOKEN}/sendMessage
+  Body: { "chat_id": "{CHAT_ID}", "text": "<summary text>", "parse_mode": "Markdown" }
+- If the environment variables are not set, skip silently — do not fail the job
+- Keep the message concise (under 4000 characters)
+```
+
+**When to include this:** Always add this block if `--summary` is set, so the job self-reports to Telegram on every run. The user must have `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` set in their environment — remind them if they haven't mentioned it.
+
+**Setup reminder to show the user:**
+```
+To enable Telegram notifications, set these environment variables:
+  TELEGRAM_BOT_TOKEN=your_bot_token   (from @BotFather)
+  TELEGRAM_CHAT_ID=your_chat_id       (your personal or group chat ID)
+```
 
 ### Phase 4: Save Everything
 

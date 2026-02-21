@@ -111,7 +111,9 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 			Status:   "failed",
 			ErrorMsg: err.Error(),
 		}
-		_ = db.UpdateLog(logID, time.Now(), -1, stdoutPath, stderrPath, 0, 0, 0, 0, 0, "failed", err.Error())
+		if updateErr := db.UpdateLog(logID, time.Now(), -1, stdoutPath, stderrPath, 0, 0, 0, 0, 0, "failed", err.Error()); updateErr != nil {
+			logger.Debug("Failed to update log %d for job %q after build error: %v", logID, job.Name, updateErr)
+		}
 		return result, nil
 	}
 
@@ -162,10 +164,12 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	// Update log
 	finishedAt := time.Now()
-	_ = db.UpdateLog(logID, finishedAt, result.ExitCode, stdoutPath, stderrPath,
+	if updateErr := db.UpdateLog(logID, finishedAt, result.ExitCode, stdoutPath, stderrPath,
 		result.CostUSD, result.InputTokens, result.OutputTokens,
 		result.CacheReadTokens, result.CacheCreationTokens,
-		result.Status, result.ErrorMsg)
+		result.Status, result.ErrorMsg); updateErr != nil {
+		logger.Debug("Failed to finalize log %d for job %q: %v", logID, job.Name, updateErr)
+	}
 
 	logger.Debug("Job %q finished: status=%s exit=%d duration=%s cost=$%.4f",
 		job.Name, result.Status, result.ExitCode, result.Duration, result.CostUSD)

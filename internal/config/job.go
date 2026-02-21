@@ -23,8 +23,9 @@ type JobConfig struct {
 	PromptFile       string `yaml:"prompt_file"`
 	Model            string `yaml:"model,omitempty"`
 	Timeout          int    `yaml:"timeout,omitempty"`
-	Effort           string `yaml:"effort,omitempty"`
-	SummaryEnabled   bool   `yaml:"summary_enabled,omitempty"`
+	Effort           string   `yaml:"effort,omitempty"`
+	DisallowedTools  []string `yaml:"disallowed_tools,omitempty"`
+	SummaryEnabled   bool     `yaml:"summary_enabled,omitempty"`
 	NoSessionPersist bool   `yaml:"no_session_persistence,omitempty"`
 	Enabled          bool   `yaml:"enabled"`
 }

@@ -12,6 +12,12 @@ go build ./...          # compile check all packages
 make build              # build with version ldflags
 make lint               # golangci-lint
 
+# Install globally (build + install in one step)
+go install github.com/DikaVer/opencron/cmd/opencron@latest  # any platform
+sudo make install                   # Linux/macOS → /usr/local/bin/
+go install ./cmd/opencron/          # Windows → %GOPATH%\bin\
+make uninstall                      # Remove from install path
+
 # CLI subcommands
 opencron                # interactive TUI menu
 opencron setup          # run (or re-run) the setup wizard
@@ -69,7 +75,7 @@ Shared logic lives in the `cmd` package as unexported functions so both modes re
 
 **Daemon:** `daemon.Run()` → PID file → SQLite → loads configs → cron entries (`SkipIfStillRunning`) → starts Telegram bot (if configured) → fsnotify watcher → blocks on SIGINT/SIGTERM → stops bot → stops cron → graceful shutdown.
 
-**Telegram chat:** User sends text → `handleChatMessage()` → per-user lock (prevents concurrent processing) → `sessionManager.GetOrCreateSession()` → starts typing indicator loop → `chat.Runner.Run()` executes `claude -p --session-id <uuid>` → logs to SQLite → sends response to Telegram + echoes to terminal.
+**Telegram chat:** User sends text → `handleChatMessage()` → per-user lock (prevents concurrent processing) → `sessionManager.GetOrCreateSession()` (returns isNew bool) → starts typing indicator loop → `chat.Runner.Run()` executes `claude -p --session-id <uuid>` (new) or `claude -p --resume <uuid>` (existing) → logs to SQLite → sends response to Telegram + echoes to terminal.
 
 **Hot-reload:** fsnotify → 500ms debounce → `Reload()` holds mutex for entire operation: clears and re-registers all jobs atomically.
 
@@ -93,7 +99,7 @@ Settings {
 
 ### JobConfig fields (config/job.go)
 
-`ID`, `Name`, `Schedule`, `WorkingDir`, `PromptFile`, `Model`, `Timeout`, `Effort`, `SummaryEnabled`, `NoSessionPersist`, `Enabled`
+`ID`, `Name`, `Schedule`, `WorkingDir`, `PromptFile`, `Model`, `Timeout`, `Effort`, `DisallowedTools`, `SummaryEnabled`, `NoSessionPersist`, `Enabled`
 
 ### Hardcoded execution defaults
 
@@ -104,6 +110,7 @@ Settings {
 | `no_session_persistence` | `true` | Default in wizard |
 | `timeout` | `300` | 5 minutes default |
 | `effort` | (empty = high) | Claude Code default |
+| `disallowed_tools` | (empty) | Optional tool restriction list |
 | `summary_enabled` | `false` | Optional summary injection |
 
 ### Platform support
@@ -123,18 +130,18 @@ Settings {
   ├── logs/               # stdout (.json) / stderr (.log) per execution
   ├── summary/            # Execution summaries (when summary_enabled)
   ├── workspace/          # CLAUDE.md + .claude/ (copied from .workspace/ during setup)
-  ├── data/opencron.db   # SQLite (WAL mode)
+  ├── data/opencron.db    # SQLite (WAL mode)
   ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
-  └── opencron.pid       # Daemon lock file
+  └── opencron.pid        # Daemon lock file
 ```
 
 ### Telegram bot architecture
 
 Bot runs inside the daemon (`opencron start`). Single process — no IPC needed.
 
-**Commands:** `/new` (clear session), `/jobs` (inline keyboard job list), `/model` (inline keyboard model picker), `/effort` (inline keyboard effort picker), `/status` (daemon + session info), `/help`
+**Commands:** `/new` (clear session), `/stop` (cancel running query), `/jobs` (inline keyboard job list), `/model` (inline keyboard model picker), `/effort` (inline keyboard effort picker), `/status` (daemon + session info), `/help`
 
-**Chat flow:** Text message → auth check → per-user mutex → get/create session → typing indicator loop (5s refresh) → `claude -p --session-id <uuid>` → parse JSON → send response + log to SQLite + echo to terminal
+**Chat flow:** Text message → auth check → per-user mutex → get/create session → store cancel func → typing indicator loop (5s refresh) → `claude -p --session-id <uuid>` (no timeout) → parse JSON → send response + log to SQLite + echo to terminal. `/stop` cancels the in-flight query by calling the stored cancel func.
 
 **Session management:** `chat_sessions` maps Telegram userID → UUID. The UUID is passed as `--session-id` to Claude Code, which manages conversation history internally. `/new` deactivates current session and creates a fresh UUID.
 
@@ -159,5 +166,5 @@ Bot runs inside the daemon (`opencron start`). Single process — no IPC needed.
 - **Prompt file security:** Must be relative path, no `..` traversal, no absolute paths
 - **Model validation:** Only allows `sonnet`, `opus`, `haiku` and their full model IDs
 - **First-run detection:** `PersistentPreRunE` on rootCmd checks `IsSetupComplete()` — skips for `setup`, `help`, `version` commands
-- **Chat timeout:** 120s for chat messages (vs 300s default for scheduled jobs)
+- **Chat timeout:** No timeout for chat messages (use `/stop` to cancel); scheduled jobs use configured timeout (default 300s)
 - **Telegram bot token:** Stored in `settings.json` — not committed to git

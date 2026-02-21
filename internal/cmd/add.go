@@ -36,6 +36,7 @@ func init() {
 	addCmd.Flags().String("effort", "", "effort level: low, medium, high (default), max")
 	addCmd.Flags().Int("timeout", 300, "timeout in seconds")
 	addCmd.Flags().Bool("summary", false, "enable Telegram-style summary after each run")
+	addCmd.Flags().StringArray("disallowed-tools", nil, "tools to deny (repeatable, e.g. --disallowed-tools \"Bash(git:*)\" --disallowed-tools \"Edit\")")
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -90,6 +91,7 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	workingDir, _ := cmd.Flags().GetString("working-dir")
 	summaryEnabled, _ := cmd.Flags().GetBool("summary")
+	disallowedTools, _ := cmd.Flags().GetStringArray("disallowed-tools")
 
 	// Validate required flags
 	var missing []string
@@ -137,6 +139,7 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		Model:            model,
 		Effort:           effort,
 		Timeout:          timeout,
+		DisallowedTools:  disallowedTools,
 		SummaryEnabled:   summaryEnabled,
 		NoSessionPersist: true,
 		Enabled:          true,
@@ -161,6 +164,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		fmt.Printf("  Effort:   %s\n", effort)
 	}
 	fmt.Printf("  Timeout:  %ds\n", timeout)
+	if len(disallowedTools) > 0 {
+		fmt.Printf("  Denied:   %s\n", strings.Join(disallowedTools, ", "))
+	}
 	if summaryEnabled {
 		fmt.Printf("  Summary:  enabled\n")
 	}

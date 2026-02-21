@@ -11,9 +11,9 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-// ClearScreen clears the terminal and moves the cursor to the top-left.
+// ClearScreen clears the terminal, scrollback buffer, and moves the cursor to the top-left.
 func ClearScreen() {
-	fmt.Print("\033[H\033[2J")
+	fmt.Print("\033[H\033[2J\033[3J")
 }
 
 // IsAborted returns true if the error is huh.ErrUserAborted (user pressed Escape).

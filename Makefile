@@ -2,6 +2,7 @@ BINARY_NAME=opencron
 BUILD_DIR=./build
 CMD_DIR=./cmd/opencron
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+PREFIX ?= /usr/local
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION)"
 
 .PHONY: build clean test install install-skill install-agents
@@ -24,7 +25,21 @@ test:
 	go test ./...
 
 install: build
-	cp $(BUILD_DIR)/$(BINARY_NAME) $(GOPATH)/bin/$(BINARY_NAME)
+ifeq ($(OS),Windows_NT)
+	@echo "Windows detected — copying to $(GOPATH)\bin"
+	@if not exist "$(GOPATH)\bin" mkdir "$(GOPATH)\bin"
+	cp $(BUILD_DIR)/$(BINARY_NAME).exe $(GOPATH)/bin/$(BINARY_NAME).exe
+else
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(DESTDIR)$(PREFIX)/bin/$(BINARY_NAME)
+endif
+
+uninstall:
+ifeq ($(OS),Windows_NT)
+	rm -f $(GOPATH)/bin/$(BINARY_NAME).exe
+else
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BINARY_NAME)
+endif
 
 tidy:
 	go mod tidy

@@ -60,6 +60,12 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 		args = append(args, "--effort", job.Effort)
 	}
 
+	// Disallowed tools
+	if len(job.DisallowedTools) > 0 {
+		args = append(args, "--disallowedTools")
+		args = append(args, job.DisallowedTools...)
+	}
+
 	// Read prompt from file
 	promptPath := filepath.Join(platform.PromptsDir(), job.PromptFile)
 	promptContent, err := os.ReadFile(promptPath)

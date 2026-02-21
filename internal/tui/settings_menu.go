@@ -35,7 +35,7 @@ func RunSettingsMenu() (SettingsAction, error) {
 	s := platform.LoadSettings()
 
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  Settings"))
+	fmt.Println(ui.Title.Render("  ⚙️  Settings"))
 	fmt.Println()
 
 	// Show current settings summary
@@ -43,7 +43,7 @@ func RunSettingsMenu() (SettingsAction, error) {
 	if s.Provider != nil {
 		providerStr = s.Provider.ID
 	}
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Provider:"), providerStr)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🔌 Provider:"), providerStr)
 
 	messengerStr := "not configured"
 	if s.Messenger != nil && s.Messenger.Type != "" {
@@ -56,24 +56,24 @@ func RunSettingsMenu() (SettingsAction, error) {
 		}
 		messengerStr += fmt.Sprintf(" (%d users)", userCount)
 	}
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Messenger:"), messengerStr)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("💬 Messenger:"), messengerStr)
 
 	chatStr := "sonnet / high"
 	if s.Chat != nil {
 		chatStr = s.Chat.Model + " / " + s.Chat.Effort
 	}
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Chat:"), chatStr)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🧠 Chat:"), chatStr)
 
 	daemonStr := "background"
 	if s.DaemonMode != "" {
 		daemonStr = s.DaemonMode
 	}
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Daemon:"), daemonStr)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🤖 Daemon:"), daemonStr)
 
 	if s.Debug {
-		fmt.Printf("  %s %s\n", ui.Dim.Render("Debug:"), ui.Success.Render("on"))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("🐛 Debug:"), ui.Success.Render("✅ on"))
 	} else {
-		fmt.Printf("  %s %s\n", ui.Dim.Render("Debug:"), ui.Fail.Render("off"))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("🐛 Debug:"), ui.Fail.Render("❌ off"))
 	}
 	fmt.Println()
 
@@ -83,13 +83,13 @@ func RunSettingsMenu() (SettingsAction, error) {
 			huh.NewSelect[int]().
 				Title("What would you like to change?").
 				Options(
-					huh.NewOption("Provider", int(SettingsProvider)),
-					huh.NewOption("Messenger", int(SettingsMessenger)),
-					huh.NewOption("Chat Model", int(SettingsChatModel)),
-					huh.NewOption("Daemon mode", int(SettingsDaemonMode)),
-					huh.NewOption("Debug logging", int(SettingsDebug)),
-					huh.NewOption("Re-run setup", int(SettingsRerunSetup)),
-					huh.NewOption("<< Back", int(SettingsBack)),
+					huh.NewOption("🔌 Provider", int(SettingsProvider)),
+					huh.NewOption("💬 Messenger", int(SettingsMessenger)),
+					huh.NewOption("🧠 Chat Model", int(SettingsChatModel)),
+					huh.NewOption("🤖 Daemon mode", int(SettingsDaemonMode)),
+					huh.NewOption("🐛 Debug logging", int(SettingsDebug)),
+					huh.NewOption("🔁 Re-run setup", int(SettingsRerunSetup)),
+					huh.NewOption("◀️  Back", int(SettingsBack)),
 				).
 				Value(&choice),
 		),
@@ -110,9 +110,9 @@ func RunProviderSettings() error {
 	ClearScreen()
 	s := platform.LoadSettings()
 	if s.Provider != nil {
-		fmt.Printf("\n  %s %s\n", ui.Dim.Render("Current provider:"), s.Provider.ID)
+		fmt.Printf("\n  %s %s\n", ui.Dim.Render("🔌 Current provider:"), s.Provider.ID)
 	} else {
-		fmt.Printf("\n  %s not configured\n", ui.Dim.Render("Current provider:"))
+		fmt.Printf("\n  %s not configured\n", ui.Dim.Render("🔌 Current provider:"))
 	}
 	fmt.Println(ui.Dim.Render("  Only Anthropic (Claude Code) is currently supported."))
 	fmt.Println()
@@ -126,8 +126,8 @@ func RunMessengerSettings() (*platform.MessengerSettings, error) {
 
 	if s.Messenger != nil && s.Messenger.Type != "" {
 		fmt.Println()
-		fmt.Printf("  %s %s\n", ui.Dim.Render("Type:"), s.Messenger.Type)
-		fmt.Printf("  %s %s...%s\n", ui.Dim.Render("Token:"), s.Messenger.BotToken[:8], s.Messenger.BotToken[len(s.Messenger.BotToken)-4:])
+		fmt.Printf("  %s %s\n", ui.Dim.Render("💬 Type:"), s.Messenger.Type)
+		fmt.Printf("  %s %s...%s\n", ui.Dim.Render("🔑 Token:"), s.Messenger.BotToken[:8], s.Messenger.BotToken[len(s.Messenger.BotToken)-4:])
 
 		userCount := 0
 		for _, v := range s.Messenger.AllowedUsers {
@@ -135,10 +135,10 @@ func RunMessengerSettings() (*platform.MessengerSettings, error) {
 				userCount++
 			}
 		}
-		fmt.Printf("  %s %d\n", ui.Dim.Render("Allowed users:"), userCount)
+		fmt.Printf("  %s %d\n", ui.Dim.Render("👥 Allowed users:"), userCount)
 		fmt.Println()
 
-		reconfigure, err := ConfirmAction("Reconfigure messenger?", "This will replace the current configuration.")
+		reconfigure, err := ConfirmAction("🔄 Reconfigure messenger?", "This will replace the current configuration.")
 		if err != nil {
 			return nil, err
 		}
@@ -170,12 +170,12 @@ func RunDaemonModeSettings() (string, error) {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
-				Title("Daemon Mode").
+				Title("🤖 Daemon Mode").
 				Description(fmt.Sprintf("Current: %s", current)).
 				Options(
-					huh.NewOption("Background process", "background"),
-					huh.NewOption("System service", "service"),
-					huh.NewOption("<< Back", ""),
+					huh.NewOption("💻 Background process", "background"),
+					huh.NewOption("🖥️  System service", "service"),
+					huh.NewOption("◀️  Back", ""),
 				).
 				Value(&mode),
 		),

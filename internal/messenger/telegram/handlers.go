@@ -42,8 +42,12 @@ func (b *Bot) handleNew(ctx context.Context, tgBot *bot.Bot, update *models.Upda
 	userID := update.Message.From.ID
 	chatID := update.Message.Chat.ID
 
-	// Deactivate existing sessions
-	if err := b.db.DeactivateUserSessions(userID); err != nil {
+	// Deactivate existing sessions via session manager
+	if b.sessionMgr != nil {
+		if err := b.sessionMgr.ClearSession(userID); err != nil {
+			logger.Debug("Error clearing session for user %d: %v", userID, err)
+		}
+	} else if err := b.db.DeactivateUserSessions(userID); err != nil {
 		logger.Debug("Error deactivating sessions for user %d: %v", userID, err)
 	}
 

@@ -37,9 +37,26 @@ type Daemon struct {
 	tgBot   *telegram.Bot
 }
 
+// cronLogger routes cron library messages to OpenCron logging.
+type cronLogger struct {
+	stdlog *log.Logger
+}
+
+func (l *cronLogger) Info(msg string, keysAndValues ...interface{}) {
+	logger.Debug("cron info: msg=%s fields=%v", msg, keysAndValues)
+}
+
+func (l *cronLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+	if l.stdlog != nil {
+		l.stdlog.Printf("Cron error: %s: %v (fields=%v)", msg, err, keysAndValues)
+	}
+	logger.Debug("cron error: msg=%s err=%v fields=%v", msg, err, keysAndValues)
+}
+
 // Run starts the daemon in the foreground.
 func Run() error {
 	stdlog := log.New(os.Stdout, "[opencron] ", log.LstdFlags)
+	cronLog := &cronLogger{stdlog: stdlog}
 
 	if err := platform.EnsureDirs(); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
@@ -61,7 +78,10 @@ func Run() error {
 	d := &Daemon{
 		cron: cron.New(
 			cron.WithParser(ui.CronParser),
-			cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)),
+			cron.WithChain(
+				cron.Recover(cronLog),
+				cron.SkipIfStillRunning(cronLog),
+			),
 		),
 		db:     db,
 		jobs:   make(map[string]cron.EntryID),

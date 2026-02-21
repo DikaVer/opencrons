@@ -1,15 +1,16 @@
 // wizard.go implements the job creation and editing wizards.
 //
 // WizardResult holds the resulting job configuration and prompt content.
-// RunAddWizard presents a 6-step form covering name, working directory, schedule
-// (presets or custom cron), prompt text, model, effort, timeout, and summary toggle.
-// RunEditWizard allows modifying an existing job's configuration. Both wizards use
-// the Catppuccin Mocha theme. The parseInt helper converts string inputs to integers.
+// RunAddWizard presents a 7-step form covering name, working directory, schedule
+// (presets or custom cron), prompt text, model, effort, timeout, summary toggle,
+// and disallowed tools. RunEditWizard allows modifying an existing job's
+// configuration. Both wizards use the Catppuccin Mocha theme.
 package tui
 
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -24,6 +25,28 @@ var theme = func() *huh.Theme {
 	return t
 }()
 
+// claudeCodeTools defines the known Claude Code tools for the disallowed tools selector.
+var claudeCodeTools = []struct {
+	Name  string
+	Label string
+}{
+	{"Bash", "Bash — execute shell commands"},
+	{"Read", "Read — read file contents"},
+	{"Write", "Write — create new files"},
+	{"Edit", "Edit — modify existing files"},
+	{"Glob", "Glob — find files by pattern"},
+	{"Grep", "Grep — search file contents"},
+	{"WebFetch", "WebFetch — fetch web content"},
+	{"WebSearch", "WebSearch — search the web"},
+	{"NotebookEdit", "NotebookEdit — edit Jupyter notebooks"},
+	{"Task", "Task — spawn subagent tasks"},
+}
+
+// Tools that are ALLOWED by default in the add wizard (not pre-selected as disallowed).
+var defaultAllowedTools = map[string]bool{
+	"Read": true, "Glob": true, "Grep": true, "WebFetch": true, "WebSearch": true,
+}
+
 // WizardResult holds the output of the interactive wizard.
 type WizardResult struct {
 	Job           *config.JobConfig
@@ -33,25 +56,26 @@ type WizardResult struct {
 // RunAddWizard runs the interactive wizard to create a new job.
 func RunAddWizard() (*WizardResult, error) {
 	var (
-		name           string
-		workingDir     string
-		schedule       string
-		presetKey      string
-		prompt         string
-		model          string
-		effort         string
-		timeout        string
-		summaryEnabled bool
+		name              string
+		workingDir        string
+		schedule          string
+		presetKey         string
+		prompt            string
+		model             string
+		effort            string
+		timeout           string
+		disallowedTools   []string
+		summaryEnabled    bool
 	)
 
 	cwd, _ := os.Getwd()
 
-	fmt.Println(ui.Title.MarginBottom(1).Render("  Add New Scheduled Job"))
+	fmt.Println(ui.Title.MarginBottom(1).Render("  ✨ Add New Scheduled Job"))
 
 	// Step 1: Job identity
 	step1 := huh.NewGroup(
 		huh.NewInput().
-			Title("Job Name").
+			Title("🏷️  Job Name").
 			Description("Unique identifier for this job. Use lowercase with hyphens (e.g. nightly-review, weekly-audit).").
 			Placeholder("nightly-review").
 			Value(&name).
@@ -65,7 +89,7 @@ func RunAddWizard() (*WizardResult, error) {
 				return nil
 			}),
 		huh.NewInput().
-			Title("Working Directory").
+			Title("📁 Working Directory").
 			Description("The project directory where Claude will execute. Claude can only access files in this directory and its subdirectories.").
 			Placeholder(cwd).
 			Value(&workingDir).
@@ -80,15 +104,15 @@ func RunAddWizard() (*WizardResult, error) {
 	// Step 2: Schedule
 	step2 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Schedule").
+			Title("⏰ Schedule").
 			Description("When should this job run? Uses standard cron format (minute hour day-of-month month day-of-week).").
 			Options(
-				huh.NewOption("Every hour", "0 * * * *"),
-				huh.NewOption("Every 6 hours", "0 */6 * * *"),
-				huh.NewOption("Daily at 2 AM", "0 2 * * *"),
-				huh.NewOption("Daily at 9 AM", "0 9 * * *"),
-				huh.NewOption("Weekly (Monday 9 AM)", "0 9 * * 1"),
-				huh.NewOption("Custom cron expression", "custom"),
+				huh.NewOption("🔄 Every hour", "0 * * * *"),
+				huh.NewOption("🔄 Every 6 hours", "0 */6 * * *"),
+				huh.NewOption("🌙 Daily at 2 AM", "0 2 * * *"),
+				huh.NewOption("☀️  Daily at 9 AM", "0 9 * * *"),
+				huh.NewOption("📅 Weekly (Monday 9 AM)", "0 9 * * 1"),
+				huh.NewOption("✏️  Custom cron expression", "custom"),
 			).
 			Value(&presetKey),
 	)
@@ -96,7 +120,7 @@ func RunAddWizard() (*WizardResult, error) {
 	// Step 3: Prompt
 	step3 := huh.NewGroup(
 		huh.NewText().
-			Title("Prompt").
+			Title("📝 Prompt").
 			Description("What should Claude do? Be specific: describe the task, expected output, and any constraints.\nTip: For polished prompts, use /schedule add inside Claude Code instead.").
 			Placeholder("Review all changed files for security vulnerabilities and generate a report...").
 			CharLimit(5000).
@@ -108,12 +132,12 @@ func RunAddWizard() (*WizardResult, error) {
 	// Step 4: Model
 	step4 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Model").
+			Title("🧠 Model").
 			Description("Which Claude model to use. Sonnet is the best balance of speed and capability for most tasks.").
 			Options(
-				huh.NewOption("Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
-				huh.NewOption("Opus — most capable, best for complex reasoning", "opus"),
-				huh.NewOption("Haiku — fastest, cheapest, good for simple tasks", "haiku"),
+				huh.NewOption("⚡ Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
+				huh.NewOption("🧠 Opus — most capable, best for complex reasoning", "opus"),
+				huh.NewOption("🐇 Haiku — fastest, cheapest, good for simple tasks", "haiku"),
 			).
 			Value(&model),
 	)
@@ -121,14 +145,14 @@ func RunAddWizard() (*WizardResult, error) {
 	// Step 5: Effort Level
 	step5 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Effort Level").
+			Title("💪 Effort Level").
 			Description("Controls how much thinking effort Claude puts in. Higher = better results but more tokens.\n"+
 				"Low saves tokens, medium balances cost/quality, high is full capability (default).").
 			Options(
-				huh.NewOption("High — full capability, default (recommended)", "high"),
-				huh.NewOption("Medium — balanced speed and cost", "medium"),
-				huh.NewOption("Low — most token-efficient, good for simple tasks", "low"),
-				huh.NewOption("Max — absolute maximum capability (Opus only)", "max"),
+				huh.NewOption("🔥 High — full capability, default (recommended)", "high"),
+				huh.NewOption("⚖️  Medium — balanced speed and cost", "medium"),
+				huh.NewOption("💨 Low — most token-efficient, good for simple tasks", "low"),
+				huh.NewOption("💎 Max — absolute maximum capability (Opus only)", "max"),
 			).
 			Value(&effort),
 	)
@@ -136,19 +160,36 @@ func RunAddWizard() (*WizardResult, error) {
 	// Step 6: Timeout & Summary
 	step6 := huh.NewGroup(
 		huh.NewInput().
-			Title("Timeout (seconds)").
+			Title("⏱️  Timeout (seconds)").
 			Description("Maximum wall-clock time for the job. The process is killed if it exceeds this limit.\n"+
 				"Quick tasks: 60-120s. Standard tasks: 300s (5 min). Complex tasks: 600-900s. Default: 300.").
 			Placeholder("300").
 			Value(&timeout),
 		huh.NewConfirm().
-			Title("Enable Report Summarization").
+			Title("📊 Enable Report Summarization").
 			Description(fmt.Sprintf("When enabled, Claude generates a short Telegram-style summary after each run.\n"+
 				"Summaries are saved to: %s", platform.SummaryDir())).
 			Value(&summaryEnabled),
 	)
 
-	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
+	// Step 7: Disallowed Tools — default denies write/execute tools, allows read-only
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if !defaultAllowedTools[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
+	step7 := huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("🚫 Disallowed Tools").
+			Description("Selected tools will be DENIED during job execution. Deselect to allow.").
+			Options(toolOptions...).
+			Value(&disallowedTools),
+	)
+
+	form := huh.NewForm(step1, step2, step3, step4, step5, step6, step7).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -164,8 +205,8 @@ func RunAddWizard() (*WizardResult, error) {
 		customForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("Custom Cron Expression").
-					Description("Standard 5-field cron: minute hour day-of-month month day-of-week\n"+
+					Title("✏️  Custom Cron Expression").
+					Description("Standard 5-field cron: minute hour day-of-month month day-of-week\n" +
 						"Examples: */30 * * * * (every 30 min), 0 9,17 * * 1-5 (9am & 5pm weekdays)").
 					Placeholder("*/30 * * * *").
 					Value(&customCron).
@@ -205,6 +246,7 @@ func RunAddWizard() (*WizardResult, error) {
 		Model:            model,
 		Timeout:          parseInt(timeout, 300),
 		Effort:           effortVal,
+		DisallowedTools:  nilIfEmpty(disallowedTools),
 		SummaryEnabled:   summaryEnabled,
 		NoSessionPersist: true,
 		Enabled:          true,
@@ -232,7 +274,14 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	}
 	summaryEnabled := job.SummaryEnabled
 
-	fmt.Println(ui.Title.MarginBottom(1).Render(fmt.Sprintf("  Edit Job: %s", job.Name)))
+	// Build set of currently disallowed tools for pre-selection
+	disabledSet := make(map[string]bool)
+	for _, t := range job.DisallowedTools {
+		disabledSet[t] = true
+	}
+	var disallowedTools []string
+
+	fmt.Println(ui.Title.MarginBottom(1).Render(fmt.Sprintf("  ✏️  Edit Job: %s", job.Name)))
 
 	// Check if current schedule matches a preset
 	isPreset := false
@@ -249,22 +298,22 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 
 	step1 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Schedule").
-			Description(fmt.Sprintf("Current: %s\nUse arrow keys to navigate, Enter to select.", job.Schedule)).
+			Title("⏰ Schedule").
+			Description(fmt.Sprintf("Current: %s", job.Schedule)).
 			Options(
-				huh.NewOption("Every hour", "0 * * * *"),
-				huh.NewOption("Every 6 hours", "0 */6 * * *"),
-				huh.NewOption("Daily at 2 AM", "0 2 * * *"),
-				huh.NewOption("Daily at 9 AM", "0 9 * * *"),
-				huh.NewOption("Weekly (Monday 9 AM)", "0 9 * * 1"),
-				huh.NewOption("Custom cron expression", "custom"),
+				huh.NewOption("🔄 Every hour", "0 * * * *"),
+				huh.NewOption("🔄 Every 6 hours", "0 */6 * * *"),
+				huh.NewOption("🌙 Daily at 2 AM", "0 2 * * *"),
+				huh.NewOption("☀️  Daily at 9 AM", "0 9 * * *"),
+				huh.NewOption("📅 Weekly (Monday 9 AM)", "0 9 * * 1"),
+				huh.NewOption("✏️  Custom cron expression", "custom"),
 			).
 			Value(&presetKey),
 	)
 
 	step2 := huh.NewGroup(
 		huh.NewText().
-			Title("Prompt").
+			Title("📝 Prompt").
 			Description("Edit the prompt. Be specific about the task, expected output, and constraints.").
 			CharLimit(5000).
 			Lines(6).
@@ -274,43 +323,59 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 
 	step3 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Model").
-			Description("Use arrow keys to navigate, Enter to select.").
+			Title("🧠 Model").
 			Options(
-				huh.NewOption("Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
-				huh.NewOption("Opus — most capable, best for complex reasoning", "opus"),
-				huh.NewOption("Haiku — fastest, cheapest, good for simple tasks", "haiku"),
+				huh.NewOption("⚡ Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
+				huh.NewOption("🧠 Opus — most capable, best for complex reasoning", "opus"),
+				huh.NewOption("🐇 Haiku — fastest, cheapest, good for simple tasks", "haiku"),
 			).
 			Value(&model),
 	)
 
 	step4 := huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Effort Level").
+			Title("💪 Effort Level").
 			Description("Controls thinking effort. Higher = better results but more tokens.").
 			Options(
-				huh.NewOption("High — full capability, default (recommended)", "high"),
-				huh.NewOption("Medium — balanced speed and cost", "medium"),
-				huh.NewOption("Low — most token-efficient, good for simple tasks", "low"),
-				huh.NewOption("Max — absolute maximum capability (Opus only)", "max"),
+				huh.NewOption("🔥 High — full capability, default (recommended)", "high"),
+				huh.NewOption("⚖️  Medium — balanced speed and cost", "medium"),
+				huh.NewOption("💨 Low — most token-efficient, good for simple tasks", "low"),
+				huh.NewOption("💎 Max — absolute maximum capability (Opus only)", "max"),
 			).
 			Value(&effort),
 	)
 
 	step5 := huh.NewGroup(
 		huh.NewInput().
-			Title("Timeout (seconds)").
+			Title("⏱️  Timeout (seconds)").
 			Description("Quick: 60-120s. Standard: 300s. Complex: 600-900s. Default: 300.").
 			Placeholder("300").
 			Value(&timeout),
 		huh.NewConfirm().
-			Title("Enable Report Summarization").
+			Title("📊 Enable Report Summarization").
 			Description(fmt.Sprintf("Generates a short Telegram-style summary after each run.\n"+
 				"Summaries saved to: %s", platform.SummaryDir())).
 			Value(&summaryEnabled),
 	)
 
-	form := huh.NewForm(step1, step2, step3, step4, step5).
+	// Step 6: Disallowed Tools — pre-select based on existing config
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if disabledSet[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
+	step6 := huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("🚫 Disallowed Tools").
+			Description("Selected tools will be DENIED during job execution. Deselect to allow.").
+			Options(toolOptions...).
+			Value(&disallowedTools),
+	)
+
+	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -326,7 +391,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		customForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("Custom Cron Expression").
+					Title("✏️  Custom Cron Expression").
 					Description("5-field cron: minute hour day-of-month month day-of-week").
 					Placeholder(job.Schedule).
 					Value(&customCron).
@@ -351,11 +416,23 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		effortVal = ""
 	}
 
+	// Preserve custom tool patterns from YAML that aren't in the known tools list
+	knownToolNames := make(map[string]bool)
+	for _, t := range claudeCodeTools {
+		knownToolNames[t.Name] = true
+	}
+	for _, t := range job.DisallowedTools {
+		if !knownToolNames[t] {
+			disallowedTools = append(disallowedTools, t)
+		}
+	}
+
 	// Update job config (keep ID, Name, WorkingDir, PromptFile)
 	job.Schedule = schedule
 	job.Model = model
 	job.Effort = effortVal
 	job.Timeout = parseInt(timeout, 300)
+	job.DisallowedTools = nilIfEmpty(disallowedTools)
 	job.SummaryEnabled = summaryEnabled
 
 	return &WizardResult{
@@ -369,7 +446,17 @@ func parseInt(s string, defaultVal int) int {
 	if s == "" {
 		return defaultVal
 	}
-	var i int
-	fmt.Sscanf(s, "%d", &i)
+	i, err := strconv.Atoi(s)
+	if err != nil || i <= 0 {
+		return defaultVal
+	}
 	return i
+}
+
+// nilIfEmpty returns nil if the slice is empty, preserving omitempty behavior.
+func nilIfEmpty(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	return s
 }

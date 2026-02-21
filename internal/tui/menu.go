@@ -51,7 +51,7 @@ func RunMainMenu() (MenuAction, error) {
 
 	// Show header
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  OpenCron — Claude Code Automation"))
+	fmt.Println(ui.Title.Render("  🚀 OpenCron — Claude Code Automation"))
 	fmt.Println(ui.Dim.Render("  Schedule and manage automated Claude Code tasks"))
 	fmt.Println()
 
@@ -65,15 +65,14 @@ func RunMainMenu() (MenuAction, error) {
 		huh.NewGroup(
 			huh.NewSelect[int]().
 				Title("What would you like to do?").
-				Description("Use arrow keys to navigate, Enter to select.").
 				Options(
-					huh.NewOption("Add new job", int(MenuAddJob)),
-					huh.NewOption("Manage jobs", int(MenuManageJobs)),
-					huh.NewOption("Run job now", int(MenuRunJob)),
-					huh.NewOption("View logs", int(MenuViewLogs)),
-					huh.NewOption("Daemon", int(MenuDaemonControl)),
-					huh.NewOption("Settings", int(MenuSettings)),
-					huh.NewOption("Exit", int(MenuExit)),
+					huh.NewOption("➕ Add new job", int(MenuAddJob)),
+					huh.NewOption("📂 Manage jobs", int(MenuManageJobs)),
+					huh.NewOption("▶️  Run job now", int(MenuRunJob)),
+					huh.NewOption("📜 View logs", int(MenuViewLogs)),
+					huh.NewOption("🤖 Daemon", int(MenuDaemonControl)),
+					huh.NewOption("⚙️  Settings", int(MenuSettings)),
+					huh.NewOption("👋 Exit", int(MenuExit)),
 				).
 				Value(&choice),
 		),
@@ -102,15 +101,15 @@ func RunJobPicker(title, description string) (string, error) {
 
 	var options []huh.Option[string]
 	for _, j := range jobs {
-		status := "enabled"
+		status := "✅"
 		if !j.Enabled {
-			status = "disabled"
+			status = "⏸️"
 		}
-		label := fmt.Sprintf("%-20s  %-16s  %s", j.Name, j.Schedule, status)
+		label := fmt.Sprintf("%s %-20s  %-16s", status, j.Name, j.Schedule)
 		options = append(options, huh.NewOption(label, j.Name))
 	}
-	options = append(options, huh.NewOption("+ Add new job", "__add__"))
-	options = append(options, huh.NewOption("<< Back to menu", "__back__"))
+	options = append(options, huh.NewOption("➕ Add new job", "__add__"))
+	options = append(options, huh.NewOption("◀️  Back to menu", "__back__"))
 
 	var name string
 	form := huh.NewForm(
@@ -146,14 +145,14 @@ func RunJobActionMenu(jobName string) (JobAction, error) {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.Title.Render(fmt.Sprintf("  Job: %s", job.Name)))
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Schedule:"), job.Schedule)
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Model:"), job.Model)
-	fmt.Printf("  %s %s\n", ui.Dim.Render("Directory:"), job.WorkingDir)
+	fmt.Println(ui.Title.Render(fmt.Sprintf("  📋 Job: %s", job.Name)))
+	fmt.Printf("  %s %s\n", ui.Dim.Render("⏰ Schedule:"), job.Schedule)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("🧠 Model:"), job.Model)
+	fmt.Printf("  %s %s\n", ui.Dim.Render("📁 Directory:"), job.WorkingDir)
 	if job.Enabled {
-		fmt.Printf("  %s enabled\n", ui.Dim.Render("Status:"))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("Status:"), ui.Success.Render("✅ enabled"))
 	} else {
-		fmt.Printf("  %s disabled\n", ui.Dim.Render("Status:"))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("Status:"), ui.Fail.Render("⏸️  disabled"))
 	}
 	fmt.Println()
 
@@ -161,22 +160,21 @@ func RunJobActionMenu(jobName string) (JobAction, error) {
 
 	// Build options based on current state
 	var options []huh.Option[int]
-	options = append(options, huh.NewOption("Edit", int(JobActionEdit)))
-	options = append(options, huh.NewOption("Run now", int(JobActionRun)))
-	options = append(options, huh.NewOption("Usage", int(JobActionUsage)))
+	options = append(options, huh.NewOption("✏️  Edit", int(JobActionEdit)))
+	options = append(options, huh.NewOption("▶️  Run now", int(JobActionRun)))
+	options = append(options, huh.NewOption("📊 Usage", int(JobActionUsage)))
 	if job.Enabled {
-		options = append(options, huh.NewOption("Disable", int(JobActionDisable)))
+		options = append(options, huh.NewOption("⏸️  Disable", int(JobActionDisable)))
 	} else {
-		options = append(options, huh.NewOption("Enable", int(JobActionEnable)))
+		options = append(options, huh.NewOption("✅ Enable", int(JobActionEnable)))
 	}
-	options = append(options, huh.NewOption("Remove", int(JobActionRemove)))
-	options = append(options, huh.NewOption("<< Back", int(JobActionBack)))
+	options = append(options, huh.NewOption("🗑️  Remove", int(JobActionRemove)))
+	options = append(options, huh.NewOption("◀️  Back", int(JobActionBack)))
 
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[int]().
-				Title("What would you like to do with this job?").
-				Description("Use arrow keys to navigate, Enter to select.").
+				Title("What would you like to do?").
 				Options(options...).
 				Value(&choice),
 		),
@@ -197,15 +195,15 @@ func RunDaemonMenu() (string, error) {
 	ClearScreen()
 
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  Daemon Control"))
+	fmt.Println(ui.Title.Render("  🤖 Daemon Control"))
 	fmt.Println()
 
 	// Show daemon status
 	pid, running := platform.CheckDaemonRunning()
 	if running {
-		fmt.Printf("  Status: %s (PID %d)\n", ui.Success.Render("running"), pid)
+		fmt.Printf("  Status: %s (PID %d)\n", ui.Success.Render("🟢 running"), pid)
 	} else {
-		fmt.Printf("  Status: %s\n", ui.Fail.Render("stopped"))
+		fmt.Printf("  Status: %s\n", ui.Fail.Render("🔴 stopped"))
 	}
 	fmt.Println()
 
@@ -214,32 +212,31 @@ func RunDaemonMenu() (string, error) {
 	fmt.Println(ui.Dim.Render("  and runs them automatically at the configured times. It also"))
 	fmt.Println(ui.Dim.Render("  hot-reloads when you edit job configs — no restart needed."))
 	fmt.Println()
-	fmt.Println(ui.Dim.Render("  Start:           Run the daemon in the current terminal (foreground)."))
-	fmt.Println(ui.Dim.Render("                   Press Ctrl+C to stop it."))
+	fmt.Println(ui.Dim.Render("  ▶️  Start:          Run the daemon in the current terminal (foreground)."))
+	fmt.Println(ui.Dim.Render("                      Press Ctrl+C to stop it."))
 	fmt.Println()
-	fmt.Println(ui.Dim.Render("  Install service: Register as a system service so it starts"))
-	fmt.Println(ui.Dim.Render("                   automatically on boot. On Windows this creates a"))
-	fmt.Println(ui.Dim.Render("                   Windows Service; on Linux, a systemd unit."))
-	fmt.Println(ui.Dim.Render("                   Requires administrator/root privileges."))
+	fmt.Println(ui.Dim.Render("  🔧 Install service: Register as a system service so it starts"))
+	fmt.Println(ui.Dim.Render("                      automatically on boot. On Windows this creates a"))
+	fmt.Println(ui.Dim.Render("                      Windows Service; on Linux, a systemd unit."))
+	fmt.Println(ui.Dim.Render("                      Requires administrator/root privileges."))
 	fmt.Println()
 
 	var choice string
 	var options []huh.Option[string]
 
 	if running {
-		options = append(options, huh.NewOption("Stop daemon", "stop"))
+		options = append(options, huh.NewOption("⏹️  Stop daemon", "stop"))
 	} else {
-		options = append(options, huh.NewOption("Start daemon", "start"))
-		options = append(options, huh.NewOption("Install as service", "install"))
+		options = append(options, huh.NewOption("▶️  Start daemon", "start"))
+		options = append(options, huh.NewOption("🔧 Install as service", "install"))
 	}
-	options = append(options, huh.NewOption("View logs", "logs"))
-	options = append(options, huh.NewOption("<< Back", "back"))
+	options = append(options, huh.NewOption("📜 View logs", "logs"))
+	options = append(options, huh.NewOption("◀️  Back", "back"))
 
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Daemon action").
-				Description("Use arrow keys to navigate, Enter to select.").
 				Options(options...).
 				Value(&choice),
 		),
@@ -265,19 +262,17 @@ func RunLogsPicker() (string, error) {
 	}
 
 	var options []huh.Option[string]
-	options = append(options, huh.NewOption("All jobs", "__all__"))
+	options = append(options, huh.NewOption("📋 All jobs", "__all__"))
 	for _, j := range jobs {
-		label := fmt.Sprintf("%-20s  Show logs for this job only", j.Name)
-		options = append(options, huh.NewOption(label, j.Name))
+		options = append(options, huh.NewOption(fmt.Sprintf("📄 %s", j.Name), j.Name))
 	}
-	options = append(options, huh.NewOption("<< Back", "__back__"))
+	options = append(options, huh.NewOption("◀️  Back", "__back__"))
 
 	var name string
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
-				Title("View logs for").
-				Description("Use arrow keys to navigate, Enter to select.").
+				Title("📜 View logs for").
 				Options(options...).
 				Value(&name),
 		),
@@ -322,9 +317,9 @@ func printQuickStatus() {
 	// Daemon status
 	_, running := platform.CheckDaemonRunning()
 	if running {
-		fmt.Printf("  %s %s", ui.Dim.Render("Daemon:"), ui.Success.Render("running"))
+		fmt.Printf("  %s %s", ui.Dim.Render("Daemon:"), ui.Success.Render("🟢 running"))
 	} else {
-		fmt.Printf("  %s %s", ui.Dim.Render("Daemon:"), ui.Fail.Render("stopped"))
+		fmt.Printf("  %s %s", ui.Dim.Render("Daemon:"), ui.Fail.Render("🔴 stopped"))
 	}
 
 	// Job count
@@ -335,15 +330,15 @@ func printQuickStatus() {
 			enabledCount++
 		}
 	}
-	fmt.Printf("    %s %d total, %d enabled", ui.Dim.Render("Jobs:"), len(jobs), enabledCount)
+	fmt.Printf("    %s %d total, %d enabled", ui.Dim.Render("📋 Jobs:"), len(jobs), enabledCount)
 
 	// Messenger status
 	msgCfg := platform.GetMessengerConfig()
 	if msgCfg != nil {
 		if running {
-			fmt.Printf("    %s %s", ui.Dim.Render("Chat:"), ui.Success.Render(msgCfg.Type))
+			fmt.Printf("    %s %s", ui.Dim.Render("💬 Chat:"), ui.Success.Render(msgCfg.Type))
 		} else {
-			fmt.Printf("    %s %s", ui.Dim.Render("Chat:"), ui.Dim.Render(msgCfg.Type+" (start daemon to chat)"))
+			fmt.Printf("    %s %s", ui.Dim.Render("💬 Chat:"), ui.Dim.Render(msgCfg.Type+" (start daemon to chat)"))
 		}
 	}
 
@@ -368,7 +363,7 @@ func printQuickStatus() {
 		}
 		if !nextRun.IsZero() {
 			until := time.Until(nextRun).Round(time.Minute)
-			fmt.Printf("    %s %s in %s", ui.Dim.Render("Next:"), nextJob, until)
+			fmt.Printf("    %s %s in %s", ui.Dim.Render("⏰ Next:"), nextJob, until)
 		}
 	}
 	fmt.Println()
@@ -379,13 +374,13 @@ func RunDebugMenu(debugEnabled bool) (bool, error) {
 	ClearScreen()
 
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  Debug Logging"))
+	fmt.Println(ui.Title.Render("  🐛 Debug Logging"))
 	fmt.Println()
 
 	if debugEnabled {
-		fmt.Printf("  Current state: %s\n", ui.Success.Render("on"))
+		fmt.Printf("  Current state: %s\n", ui.Success.Render("✅ on"))
 	} else {
-		fmt.Printf("  Current state: %s\n", ui.Fail.Render("off"))
+		fmt.Printf("  Current state: %s\n", ui.Fail.Render("❌ off"))
 	}
 	fmt.Println(ui.Dim.Render("  When enabled, detailed logs are written to logs/opencron-debug.log"))
 	fmt.Println()
@@ -410,6 +405,6 @@ func RunDebugMenu(debugEnabled bool) (bool, error) {
 
 // PrintPressEnter prints a "press Enter to continue" prompt and waits.
 func PrintPressEnter() {
-	fmt.Print(ui.Dim.Render("\n  Press Enter to continue..."))
+	fmt.Print(ui.Dim.Render("\n  ⏎ Press Enter to continue..."))
 	fmt.Scanln()
 }

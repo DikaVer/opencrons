@@ -7,7 +7,7 @@
 //
 // SessionManager (in session.go) maps Telegram users to persistent
 // session UUIDs stored in SQLite, enabling multi-turn conversations
-// through Claude Code's --session-id flag.
+// through Claude Code's --session-id (new) and --resume (existing) flags.
 package chat
 
 import (
@@ -50,15 +50,23 @@ func NewRunner() *Runner {
 }
 
 // Run sends a message to Claude in the context of a session and returns the response.
+// When isNew is true the session is freshly created and --session-id is used to
+// label it; otherwise --resume is used to load prior conversation history.
 // The caller controls the lifetime via ctx — there is no internal timeout.
-func (r *Runner) Run(ctx context.Context, session *storage.ChatSession, message string) (*ChatResult, error) {
-	args := []string{
-		"-p",
-		"--session-id", session.ID,
+func (r *Runner) Run(ctx context.Context, session *storage.ChatSession, message string, isNew bool) (*ChatResult, error) {
+	args := []string{"-p"}
+
+	if isNew {
+		args = append(args, "--session-id", session.ID)
+	} else {
+		args = append(args, "--resume", session.ID)
+	}
+
+	args = append(args,
 		"--model", session.Model,
 		"--output-format", "json",
 		"--permission-mode", "bypassPermissions",
-	}
+	)
 
 	// Effort: only pass if not the default "high"
 	if session.Effort != "" && session.Effort != "high" {

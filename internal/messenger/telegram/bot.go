@@ -77,10 +77,32 @@ func New(db *storage.DB, settings *platform.MessengerSettings, stdlog *log.Logge
 func (b *Bot) Start(ctx context.Context) {
 	ctx, b.cancel = context.WithCancel(ctx)
 
+	// Register commands with Telegram so they appear in the commands menu
+	b.setCommands(ctx)
+
 	b.stdlog.Println("[telegram] Bot started")
 	logger.Info("Telegram bot started")
 
 	b.bot.Start(ctx)
+}
+
+// setCommands registers the bot's command list with Telegram.
+func (b *Bot) setCommands(ctx context.Context) {
+	_, err := b.bot.SetMyCommands(ctx, &bot.SetMyCommandsParams{
+		Commands: []models.BotCommand{
+			{Command: "new", Description: "Start a new conversation"},
+			{Command: "jobs", Description: "List scheduled jobs"},
+			{Command: "model", Description: "Change the AI model"},
+			{Command: "effort", Description: "Change the effort level"},
+			{Command: "stop", Description: "Stop the current query"},
+			{Command: "status", Description: "Show bot status"},
+			{Command: "help", Description: "Show help message"},
+		},
+	})
+	if err != nil {
+		b.stdlog.Printf("[telegram] Failed to set commands: %v", err)
+		logger.Debug("SetMyCommands error: %v", err)
+	}
 }
 
 // Stop gracefully shuts down the bot.
@@ -92,12 +114,14 @@ func (b *Bot) Stop() {
 	logger.Info("Telegram bot stopped")
 }
 
-// Send sends a text message to the given chat.
+// Send sends a text message to the given chat with HTML formatting.
+// Markdown from Claude responses is converted to Telegram HTML to avoid
+// MarkdownV2 escaping issues (e.g. backslashes in Windows paths).
 func (b *Bot) Send(ctx context.Context, chatID int64, text string) error {
 	_, err := b.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:    chatID,
-		Text:      text,
-		ParseMode: models.ParseModeMarkdown,
+		Text:      markdownToHTML(text),
+		ParseMode: models.ParseModeHTML,
 	})
 	return err
 }

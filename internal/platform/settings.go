@@ -12,7 +12,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 )
+
+var debugFlag atomic.Bool
+var debugLoaded atomic.Bool
 
 // Settings holds persisted application settings.
 type Settings struct {
@@ -31,7 +35,7 @@ type ProviderSettings struct {
 
 // MessengerSettings holds messenger platform configuration.
 type MessengerSettings struct {
-	Type         string          `json:"type"`                    // "telegram" | ""
+	Type         string          `json:"type"` // "telegram" | ""
 	BotToken     string          `json:"bot_token"`
 	AllowedUsers map[string]bool `json:"allowed_users,omitempty"`
 }
@@ -71,19 +75,39 @@ func SaveSettings(s Settings) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(settingsFile(), data, 0644)
+	if err := os.WriteFile(settingsFile(), data, 0644); err != nil {
+		return err
+	}
+
+	// Keep in-memory debug cache in sync with persisted settings.
+	debugFlag.Store(s.Debug)
+	debugLoaded.Store(true)
+	return nil
 }
 
 // IsDebugEnabled returns whether debug logging is on.
 func IsDebugEnabled() bool {
-	return LoadSettings().Debug
+	if debugLoaded.Load() {
+		return debugFlag.Load()
+	}
+
+	enabled := LoadSettings().Debug
+	debugFlag.Store(enabled)
+	debugLoaded.Store(true)
+	return enabled
 }
 
 // SetDebug enables or disables debug logging.
 func SetDebug(enabled bool) error {
 	s := LoadSettings()
 	s.Debug = enabled
-	return SaveSettings(s)
+	if err := SaveSettings(s); err != nil {
+		return err
+	}
+
+	debugFlag.Store(enabled)
+	debugLoaded.Store(true)
+	return nil
 }
 
 // IsSetupComplete returns whether the first-run setup has been completed.

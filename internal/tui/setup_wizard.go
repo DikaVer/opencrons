@@ -31,14 +31,14 @@ type SetupResult struct {
 func RunSetupWizard() (*SetupResult, error) {
 	// Step 1: Welcome
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  Welcome to OpenCron"))
+	fmt.Println(ui.Title.Render("  🎉 Welcome to OpenCron"))
 	fmt.Println()
 	fmt.Println(ui.Dim.Render("  OpenCron runs Claude Code tasks on cron schedules."))
 	fmt.Println(ui.Dim.Render("  This wizard will help you set up your environment."))
 	fmt.Println()
 
 	// Step 2: Provider detection
-	fmt.Println(ui.Title.Render("  Step 1: AI Provider"))
+	fmt.Println(ui.Title.Render("  🔌 Step 1: AI Provider"))
 	fmt.Println()
 
 	var providerID string
@@ -48,7 +48,7 @@ func RunSetupWizard() (*SetupResult, error) {
 				Title("Select AI Provider").
 				Description("Which AI provider to use for running tasks.").
 				Options(
-					huh.NewOption("Anthropic (Claude Code)", "anthropic"),
+					huh.NewOption("🤖 Anthropic (Claude Code)", "anthropic"),
 				).
 				Value(&providerID),
 		),
@@ -66,19 +66,19 @@ func RunSetupWizard() (*SetupResult, error) {
 
 	for !p.Detect() {
 		fmt.Println()
-		fmt.Println(ui.Dim.Render("  Claude Code CLI not found on PATH."))
+		fmt.Println(ui.Dim.Render("  ⚠️  Claude Code CLI not found on PATH."))
 		fmt.Println(ui.Dim.Render("  Install it: npm install -g @anthropic-ai/claude-code"))
 		fmt.Println()
 		PrintPressEnter()
 	}
 
 	if version := p.Version(); version != "" {
-		fmt.Printf("  %s %s\n", ui.Dim.Render("Claude Code:"), ui.Success.Render(version))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("✅ Claude Code:"), ui.Success.Render(version))
 	}
 	fmt.Println()
 
 	// Step 3: Messenger
-	fmt.Println(ui.Title.Render("  Step 2: Messenger Integration"))
+	fmt.Println(ui.Title.Render("  💬 Step 2: Messenger Integration"))
 	fmt.Println()
 
 	var messengerType string
@@ -88,8 +88,8 @@ func RunSetupWizard() (*SetupResult, error) {
 				Title("Messenger Platform").
 				Description("Connect a messenger to chat with Claude and manage jobs remotely.").
 				Options(
-					huh.NewOption("Telegram", "telegram"),
-					huh.NewOption("Skip (TUI only)", ""),
+					huh.NewOption("📱 Telegram", "telegram"),
+					huh.NewOption("⏭️  Skip (TUI only)", ""),
 				).
 				Value(&messengerType),
 		),
@@ -114,7 +114,7 @@ func RunSetupWizard() (*SetupResult, error) {
 
 			// Step 5: Chat Model
 			fmt.Println()
-			fmt.Println(ui.Title.Render("  Step 3: Chat Model"))
+			fmt.Println(ui.Title.Render("  🧠 Step 3: Chat Model"))
 			fmt.Println()
 
 			chatSettings, err := runChatModelForm()
@@ -129,7 +129,7 @@ func RunSetupWizard() (*SetupResult, error) {
 
 	// Step 6: Daemon mode
 	fmt.Println()
-	fmt.Println(ui.Title.Render("  Step 4: Daemon Configuration"))
+	fmt.Println(ui.Title.Render("  🤖 Step 4: Daemon Configuration"))
 	fmt.Println()
 
 	var daemonMode string
@@ -139,8 +139,8 @@ func RunSetupWizard() (*SetupResult, error) {
 				Title("Daemon Mode").
 				Description("How should the OpenCron daemon run?").
 				Options(
-					huh.NewOption("Background process", "background"),
-					huh.NewOption("System service (auto-start on boot)", "service"),
+					huh.NewOption("💻 Background process", "background"),
+					huh.NewOption("🖥️  System service (auto-start on boot)", "service"),
 				).
 				Value(&daemonMode),
 		),
@@ -153,7 +153,7 @@ func RunSetupWizard() (*SetupResult, error) {
 
 	// Done
 	fmt.Println()
-	fmt.Println(ui.Success.Render("  Setup complete!"))
+	fmt.Println(ui.Success.Render("  🎉 Setup complete!"))
 	fmt.Println()
 
 	return result, nil
@@ -163,16 +163,16 @@ func RunSetupWizard() (*SetupResult, error) {
 func runTelegramSetup() (*platform.MessengerSettings, error) {
 	fmt.Println()
 	fmt.Println(ui.Dim.Render("  Create a bot with @BotFather on Telegram to get your token."))
-	fmt.Println(ui.Dim.Render("  1. Open Telegram and search for @BotFather"))
-	fmt.Println(ui.Dim.Render("  2. Send /newbot and follow the instructions"))
-	fmt.Println(ui.Dim.Render("  3. Copy the HTTP API token"))
+	fmt.Println(ui.Dim.Render("  1️⃣  Open Telegram and search for @BotFather"))
+	fmt.Println(ui.Dim.Render("  2️⃣  Send /newbot and follow the instructions"))
+	fmt.Println(ui.Dim.Render("  3️⃣  Copy the HTTP API token"))
 	fmt.Println()
 
 	var botToken string
 	tokenForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
-				Title("Bot Token").
+				Title("🔑 Bot Token").
 				Description("Paste the HTTP API token from @BotFather.").
 				Placeholder("123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11").
 				Value(&botToken).
@@ -199,7 +199,7 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 
 	// Start pairing bot to validate token and begin code-based pairing
 	fmt.Println()
-	fmt.Println(ui.Dim.Render("  Verifying bot token..."))
+	fmt.Println(ui.Dim.Render("  🔄 Verifying bot token..."))
 
 	pb, err := telegram.StartPairingBot(botToken)
 	if err != nil {
@@ -208,9 +208,9 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 	defer pb.Stop()
 
 	if pb.BotName() != "" {
-		fmt.Println(ui.Success.Render(fmt.Sprintf("  Bot @%s is running!", pb.BotName())))
+		fmt.Println(ui.Success.Render(fmt.Sprintf("  ✅ Bot @%s is running!", pb.BotName())))
 	} else {
-		fmt.Println(ui.Success.Render("  Bot is running!"))
+		fmt.Println(ui.Success.Render("  ✅ Bot is running!"))
 	}
 
 	settings := &platform.MessengerSettings{
@@ -222,7 +222,7 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 	// Code-based pairing loop
 	for {
 		fmt.Println()
-		fmt.Println(ui.Dim.Render("  Send any message to your bot in Telegram."))
+		fmt.Println(ui.Dim.Render("  📱 Send any message to your bot in Telegram."))
 		fmt.Println(ui.Dim.Render("  You'll receive a 6-digit pairing code — enter it below."))
 		fmt.Println()
 
@@ -230,7 +230,7 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 		codeForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("Pairing Code").
+					Title("🔗 Pairing Code").
 					Description("Enter the 6-digit code from Telegram.").
 					Placeholder("000000").
 					Value(&code).
@@ -257,7 +257,7 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 
 		result, err := pb.ValidateCode(code)
 		if err != nil {
-			fmt.Println(ui.Fail.Render("  Invalid code. Make sure you sent a message to the bot and try again."))
+			fmt.Println(ui.Fail.Render("  ❌ Invalid code. Make sure you sent a message to the bot and try again."))
 			continue
 		}
 
@@ -270,9 +270,9 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 			displayName = fmt.Sprintf("%s (%d)", result.Name, result.UserID)
 		}
 
-		fmt.Println(ui.Accent.Render(fmt.Sprintf("  Paired with %s", displayName)))
+		fmt.Println(ui.Accent.Render(fmt.Sprintf("  🤝 Paired with %s", displayName)))
 
-		addMore, err := ConfirmAction("Add another user?", "")
+		addMore, err := ConfirmAction("👥 Add another user?", "")
 		if err != nil {
 			return nil, err
 		}
@@ -292,13 +292,13 @@ func runChatModelForm() (*platform.ChatSettings, error) {
 	modelForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
-				Title("Default Chat Model").
+				Title("🧠 Default Chat Model").
 				Description("Which model to use for Telegram chat sessions.").
 				Options(
-					huh.NewOption("Sonnet (recommended)", "sonnet"),
-					huh.NewOption("Opus", "opus"),
-					huh.NewOption("Haiku", "haiku"),
-					huh.NewOption("<< Back", "__back__"),
+					huh.NewOption("⚡ Sonnet — fast & capable (recommended)", "sonnet"),
+					huh.NewOption("🧠 Opus — most capable", "opus"),
+					huh.NewOption("🐇 Haiku — fastest & cheapest", "haiku"),
+					huh.NewOption("◀️  Back", "__back__"),
 				).
 				Value(&model),
 		),
@@ -318,14 +318,14 @@ func runChatModelForm() (*platform.ChatSettings, error) {
 	effortForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
-				Title("Default Effort Level").
+				Title("💪 Default Effort Level").
 				Description("Controls how much thinking effort Claude uses.").
 				Options(
-					huh.NewOption("High (recommended)", "high"),
-					huh.NewOption("Medium", "medium"),
-					huh.NewOption("Low", "low"),
-					huh.NewOption("Max (Opus only)", "max"),
-					huh.NewOption("<< Back", "__back__"),
+					huh.NewOption("🔥 High — full capability (recommended)", "high"),
+					huh.NewOption("⚖️  Medium — balanced", "medium"),
+					huh.NewOption("💨 Low — token-efficient", "low"),
+					huh.NewOption("💎 Max — absolute maximum (Opus only)", "max"),
+					huh.NewOption("◀️  Back", "__back__"),
 				).
 				Value(&effort),
 		),

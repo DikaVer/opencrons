@@ -9,7 +9,6 @@ package chat
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,28 +28,30 @@ func NewSessionManager(db *storage.DB) *SessionManager {
 }
 
 // GetOrCreateSession returns the active session for a user, creating one if needed.
-func (sm *SessionManager) GetOrCreateSession(userID, chatID int64) (*storage.ChatSession, error) {
+// The returned bool is true when a brand-new session was created (first message).
+func (sm *SessionManager) GetOrCreateSession(userID, chatID int64) (*storage.ChatSession, bool, error) {
 	session, err := sm.db.GetActiveSession(userID)
 	if err != nil {
-		return nil, fmt.Errorf("checking active session: %w", err)
+		return nil, false, fmt.Errorf("checking active session: %w", err)
 	}
 
 	if session != nil {
 		// Touch the session to update last activity
 		_ = sm.db.TouchSession(session.ID)
-		return session, nil
+		return session, false, nil
 	}
 
 	// Create a new session
-	return sm.CreateSession(userID, chatID)
+	newSession, err := sm.CreateSession(userID, chatID)
+	return newSession, true, err
 }
 
 // CreateSession creates a new chat session for a user.
 func (sm *SessionManager) CreateSession(userID, chatID int64) (*storage.ChatSession, error) {
 	chatCfg := platform.GetChatConfig()
 
-	// Use the user's home directory or a default working directory
-	workingDir, _ := os.UserHomeDir()
+	// Use the managed workspace directory so Claude sees CLAUDE.md/.claude context.
+	workingDir := platform.WorkspaceDir()
 	if workingDir == "" {
 		workingDir = "."
 	}

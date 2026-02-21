@@ -161,17 +161,20 @@ func JobNameExists(schedulesDir, name string) bool {
 	return false
 }
 
-// FindJobByName loads all jobs and returns the one matching the given name.
+// FindJobByName loads a specific job config by name.
 func FindJobByName(schedulesDir, name string) (*JobConfig, error) {
-	jobs, err := LoadAllJobs(schedulesDir)
-	if err != nil {
-		return nil, err
+	path := filepath.Join(schedulesDir, name+".yml")
+	if _, err := os.Stat(path); err == nil {
+		return LoadJob(path)
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("checking job config %s: %w", path, err)
 	}
 
-	for _, job := range jobs {
-		if job.Name == name {
-			return job, nil
-		}
+	path = filepath.Join(schedulesDir, name+".yaml")
+	if _, err := os.Stat(path); err == nil {
+		return LoadJob(path)
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("checking job config %s: %w", path, err)
 	}
 
 	return nil, fmt.Errorf("job %q not found", name)
