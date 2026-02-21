@@ -1,6 +1,4 @@
-<h1><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> OpenCron — Automated AI Scheduler</h1>
-
----
+<h1>🟪🟩 OpenCron — Automated AI Scheduler</h1>
 
 <div align="center">
   <img src="public/header.png" alt="OpenCron" width="500">
@@ -37,7 +35,7 @@ OpenCron is an open-source scheduler that runs [Claude Code](https://docs.anthro
 
 ---
 
-## 💡 Why OpenCron
+<h2><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> Why OpenCron 💡<h2>
 
 ### The OAuth lockdown changed the game
 
