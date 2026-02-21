@@ -1,0 +1,71 @@
+name: "\U0001F41B Bug Report"
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below so we can reproduce and fix it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "When I run `opencron start`, the daemon crashes with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+      placeholder: "The daemon should start and begin executing cron jobs."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Run `opencron setup`
+        2. Add a job with `opencron add`
+        3. Start daemon with `opencron start`
+        4. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Paste any relevant logs or error messages. Use `opencron debug on` for verbose output.
+      render: shell
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: OpenCron version
+      description: Run `opencron --version` to find out.
+      placeholder: "v0.1.0"
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Run `go version` to find out.
+      placeholder: "go1.25.0"

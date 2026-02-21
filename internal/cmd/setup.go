@@ -1,5 +1,5 @@
 // File setup.go implements the setup command and the runSetupWizard helper.
-// It runs the TUI setup wizard, copies .workspace/ files (AGENTS.md to CLAUDE.md,
+// It runs the TUI setup wizard, copies .workspace-example/ files (AGENTS.md to CLAUDE.md,
 // .agents/ to .claude/) into the config directory, and saves the resulting settings.
 package cmd
 
@@ -64,28 +64,28 @@ func runSetupWizard() error {
 	return nil
 }
 
-// copyWorkspace copies .workspace/ from the executable's directory to the config workspace dir.
+// copyWorkspace copies .workspace-example/ from the executable's directory to the config workspace dir.
 // In the destination: AGENTS.md -> CLAUDE.md, .agents/ -> .claude/
 func copyWorkspace() error {
-	// Find the source .workspace directory relative to the executable
+	// Find the source .workspace-example directory relative to the executable
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("finding executable: %w", err)
 	}
 	exeDir := filepath.Dir(exePath)
 
-	// Try a few locations for the .workspace directory
+	// Try a few locations for the .workspace-example directory
 	var srcDir string
 	candidates := []string{
-		filepath.Join(exeDir, ".workspace"),
-		filepath.Join(exeDir, "..", ".workspace"),
-		filepath.Join(".", ".workspace"),
+		filepath.Join(exeDir, ".workspace-example"),
+		filepath.Join(exeDir, "..", ".workspace-example"),
+		filepath.Join(".", ".workspace-example"),
 	}
 
 	// Also check cwd
 	cwd, _ := os.Getwd()
 	if cwd != "" {
-		candidates = append(candidates, filepath.Join(cwd, ".workspace"))
+		candidates = append(candidates, filepath.Join(cwd, ".workspace-example"))
 	}
 
 	for _, c := range candidates {
@@ -96,7 +96,7 @@ func copyWorkspace() error {
 	}
 
 	if srcDir == "" {
-		return fmt.Errorf(".workspace directory not found")
+		return fmt.Errorf(".workspace-example directory not found")
 	}
 
 	destDir := platform.WorkspaceDir()

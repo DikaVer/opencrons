@@ -1,0 +1,48 @@
+name: "\U0001F4A1 Feature Request"
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make OpenCron better? We'd love to hear it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this solve? Why do you need it?
+      placeholder: "I often need to run the same prompt against multiple projects, but currently I have to create separate jobs for each..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How do you think this should work?
+      placeholder: "Add a `--working-dirs` flag that accepts multiple paths, or support glob patterns in working_dir..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches you've thought about?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of OpenCron does this relate to?
+      options:
+        - CLI / Commands
+        - TUI / Interface
+        - Daemon / Scheduler
+        - Telegram Bot
+        - Job Execution
+        - Plugins / Integrations
+        - Other
+    validations:
+      required: true

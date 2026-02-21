@@ -16,5 +16,6 @@ data/
 
 .vscode
 CLAUDE.md
-.claude
-*.lnk 
+.claude/
+.codex/
+*.lnk

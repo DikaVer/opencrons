@@ -1,10 +1,20 @@
+<h1><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> OpenCron — Automated AI Scheduler</h1>
+
+---
+
 <div align="center">
-  <h1>⚡ OpenCron</h1>
+  <img src="public/header.png" alt="OpenCron" width="500">
+  <br><br>
   <p>
     Automate Claude Code on a schedule.<br>
     Chat with Claude from Telegram.<br>
     Manage everything from a beautiful TUI.
   </p>
+
+  <a href="https://github.com/DikaVer/opencron/actions"><img src="https://img.shields.io/github/actions/workflow/status/DikaVer/opencron/ci.yml?style=flat-square&label=build" alt="Build"></a>
+  <a href="https://github.com/DikaVer/opencron/releases"><img src="https://img.shields.io/github/v/release/DikaVer/opencron?style=flat-square&color=a6e3a1&label=release" alt="Release"></a>
+  <a href="https://github.com/DikaVer/opencron/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DikaVer/opencron?style=flat-square&color=cba6f7" alt="License"></a>
+  <a href="https://github.com/DikaVer/opencron"><img src="https://img.shields.io/github/go-mod/go-version/DikaVer/opencron?style=flat-square&color=89b4fa" alt="Go Version"></a>
 </div>
 
 <p align="center">
@@ -298,6 +308,14 @@ OpenCron stores its configuration and data in a platform-specific directory:
 └── opencron.pid      # daemon lock file
 ```
 
+### 🤖 Workspace (AGENTS.md)
+
+OpenCron copies a [`workspace/AGENTS.md`](.workspace-example/AGENTS.md) into your config directory during setup. This file is injected into every job as context — it acts as a shared system prompt so Claude understands it's running inside OpenCron.
+
+You can customize it to add project-wide instructions, coding standards, or constraints that apply to all your scheduled jobs.
+
+A ready-to-use example is included in the repo at [`.workspace-example/`](.workspace-example/) — it's copied automatically on first run via `opencron setup`.
+
 ### 🖥️ Platform support
 
 | | Linux | macOS | Windows |
@@ -385,8 +403,3 @@ internal/
 └── ui/                 → shared styles (Catppuccin Mocha)
 ```
 
----
-
-## 📄 License
-
-MIT

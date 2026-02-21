@@ -55,5 +55,5 @@ lint:
 
 install-skill:
 	@mkdir -p $(HOME)/.claude/skills/schedule
-	cp .workspace/.agents/skills/schedule/SKILL.md $(HOME)/.claude/skills/schedule/SKILL.md
+	cp .workspace-example/.agents/skills/schedule/SKILL.md $(HOME)/.claude/skills/schedule/SKILL.md
 	@echo "Skill installed to ~/.claude/skills/schedule/SKILL.md"
