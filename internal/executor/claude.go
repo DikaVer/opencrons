@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dika-maulidal/cli-scheduler/internal/config"
+	"github.com/dika-maulidal/cli-scheduler/internal/logger"
 	"github.com/dika-maulidal/cli-scheduler/internal/platform"
 )
 
@@ -29,65 +30,23 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*exec.Cmd, error)
 		args = append(args, "--model", job.Model)
 	}
 
-	// Permission mode
-	if job.PermissionMode != "" {
-		args = append(args, "--permission-mode", job.PermissionMode)
-	}
+	// Permission mode: always bypass for unattended scheduled execution
+	args = append(args, "--permission-mode", "bypassPermissions")
 
 	// Output format: always JSON for structured, parseable output
 	args = append(args, "--output-format", "json")
 
-	// Max budget
-	if job.MaxBudgetUSD > 0 {
-		args = append(args, "--max-budget-usd", fmt.Sprintf("%.2f", job.MaxBudgetUSD))
-	}
-
-	// Additional directories
-	for _, dir := range job.AddDirs {
-		args = append(args, "--add-dir", dir)
-	}
-
-	// MCP config
-	if job.MCPConfig != "" {
-		args = append(args, "--mcp-config", job.MCPConfig)
-	}
-
-	// Max turns
-	if job.MaxTurns > 0 {
-		args = append(args, "--max-turns", fmt.Sprintf("%d", job.MaxTurns))
-	}
-
 	// No session persistence
-	if job.NoSessionPersistence {
+	if job.NoSessionPersist {
 		args = append(args, "--no-session-persistence")
 	}
 
-	// Context & memory control: --setting-sources
-	if job.DisableProjectMemory || job.DisableUserMemory || job.DisableLocalMemory {
-		var sources []string
-		if !job.DisableProjectMemory {
-			sources = append(sources, "project")
-		}
-		if !job.DisableUserMemory {
-			sources = append(sources, "user")
-		}
-		if !job.DisableLocalMemory {
-			sources = append(sources, "local")
-		}
-		if len(sources) > 0 {
-			args = append(args, "--setting-sources", strings.Join(sources, ","))
-		} else {
-			// All disabled: pass empty to load no settings
-			args = append(args, "--setting-sources", "")
-		}
+	// Effort level
+	if job.Effort != "" {
+		args = append(args, "--effort", job.Effort)
 	}
 
-	// Disable skills/slash commands
-	if job.DisableSkills {
-		args = append(args, "--disable-slash-commands")
-	}
-
-	// Read prompt from file and pass as positional argument
+	// Read prompt from file
 	promptPath := filepath.Join(platform.PromptsDir(), job.PromptFile)
 	promptContent, err := os.ReadFile(promptPath)
 	if err != nil {
@@ -115,17 +74,7 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*exec.Cmd, error)
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Dir = job.WorkingDir
 
-	// Environment variables
-	var envExtras []string
-	if job.DisableAutoMemory {
-		envExtras = append(envExtras, "CLAUDE_CODE_DISABLE_AUTO_MEMORY=1")
-	}
-	if job.Effort != "" {
-		envExtras = append(envExtras, "CLAUDE_CODE_EFFORT_LEVEL="+job.Effort)
-	}
-	if len(envExtras) > 0 {
-		cmd.Env = append(os.Environ(), envExtras...)
-	}
+	logger.Debug("Built command: claude %s (dir=%s)", strings.Join(args, " "), job.WorkingDir)
 
 	return cmd, nil
 }

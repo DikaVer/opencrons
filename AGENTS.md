@@ -1,189 +1,163 @@
-# AGENTS.md
+# cli-scheduler
 
-Agent configuration and architecture guide for cli-scheduler.
+CLI scheduler that runs Claude Code (`claude -p`) jobs on cron schedules, with Telegram bot integration for remote chat and job management. Go + Cobra + charmbracelet TUI.
 
-## Configure with Claude Code
-
-### 1. Install the `/schedule` skill
-
-The skill gives Claude Code the `/schedule` command to create and manage jobs conversationally.
+## Commands
 
 ```bash
-# Linux/macOS
-mkdir -p ~/.claude/skills/schedule
-cp .agents/skills/schedule/SKILL.md ~/.claude/skills/schedule/SKILL.md
-
-# Windows (PowerShell)
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills\schedule"
-Copy-Item .agents\skills\schedule\SKILL.md "$env:USERPROFILE\.claude\skills\schedule\SKILL.md"
-
-# Or use make
-make install-skill
-```
-
-After installing, use `/schedule add` inside Claude Code. Claude will help write high-quality prompts and handle all configuration.
-
-### 2. Add project instructions (optional)
-
-If you want Claude Code to auto-load project context when working on this repo, create a `CLAUDE.md` at the project root. You can copy from this file or write your own.
-
-Claude Code reads these files automatically:
-- `CLAUDE.md` — project root instructions (loaded for all sessions in this directory)
-- `.claude/rules/*.md` — additional project rules
-
-### 3. Build the binary
-
-```bash
+# Build & test
 go build -o build/scheduler ./cmd/scheduler/
+go test ./...
+go build ./...          # compile check all packages
+make build              # build with version ldflags
+make lint               # golangci-lint
 
-# Or use make
-make build
+# CLI subcommands
+scheduler                # interactive TUI menu
+scheduler setup          # run (or re-run) the setup wizard
+scheduler settings       # manage provider, messenger, chat, debug settings
+scheduler add            # create a new job (wizard or flags)
+scheduler list           # list all jobs
+scheduler run <name>     # execute a job immediately
+scheduler edit <name>    # edit job config
+scheduler enable <name>  # enable a job
+scheduler disable <name> # disable a job
+scheduler remove <name>  # delete job + prompt file
+scheduler logs [name]    # view execution logs
+scheduler start          # start daemon (foreground, includes Telegram bot)
+scheduler stop           # stop running daemon
+scheduler status         # check daemon status
+scheduler validate       # validate all job configs
+scheduler debug [on|off] # toggle debug logging
 ```
-
-On Windows PowerShell: `.\build\scheduler.exe`
-
-### 4. Verify installation
-
-```bash
-scheduler --help        # Show available commands
-scheduler validate      # Validate all job configs
-scheduler status        # Check daemon status
-```
-
----
-
-## Repo Structure
-
-```
-cli-scheduler/
-├── .agents/
-│   └── skills/
-│       └── schedule/
-│           └── SKILL.md          # Claude Code skill definition (/schedule command)
-├── cmd/scheduler/main.go         # Entry point
-├── internal/
-│   ├── cmd/                      # Cobra commands + TUI menu loop
-│   ├── config/                   # JobConfig struct, YAML load/save
-│   ├── tui/                      # Interactive UI (menus, wizards, validators)
-│   ├── executor/                 # Builds `claude -p` command, runs it, parses output
-│   ├── storage/                  # SQLite execution log + token usage
-│   ├── daemon/                   # Cron orchestrator, hot-reload, OS service
-│   └── platform/                 # Cross-platform paths, PID management
-├── prompts/                      # Reference prompt templates
-├── AGENTS.md                     # This file
-├── README.md                     # User documentation
-├── Makefile                      # Build targets
-├── go.mod / go.sum               # Go module
-└── .gitignore
-```
-
----
 
 ## Architecture
-
-CLI scheduler that runs Claude Code (`claude -p`) jobs on cron schedules. Separates "what to think about" (prompt files) from "what you're allowed to do" (YAML config).
 
 ### Package dependency graph
 
 ```
 cmd/scheduler/main.go
-  └→ internal/cmd/          (Cobra commands + main TUI menu loop)
-       ├→ internal/config/   (JobConfig struct, YAML load/save, prompt file I/O)
-       ├→ internal/tui/      (Interactive UI: menus, wizards, validators)
-       ├→ internal/executor/ (Builds `claude -p` command, runs it, parses JSON output)
-       ├→ internal/storage/  (SQLite execution log + token usage)
-       ├→ internal/daemon/   (Cron orchestrator, fsnotify hot-reload, OS service)
-       └→ internal/platform/ (Cross-platform paths, PID management, process detection)
+  └→ internal/cmd/              Cobra commands + TUI menu loop
+       ├→ internal/config/       JobConfig struct, YAML load/save, prompt file I/O
+       ├→ internal/tui/          Interactive UI: menus, wizards, settings, validators (charmbracelet/huh)
+       ├→ internal/executor/     Builds `claude -p` command, runs it, parses JSON output
+       ├→ internal/storage/      SQLite execution log + token usage + chat sessions (modernc.org/sqlite)
+       ├→ internal/daemon/       Cron orchestrator, fsnotify hot-reload, OS service, Telegram bot
+       ├→ internal/platform/     Cross-platform paths, PID management, process detection, settings
+       ├→ internal/logger/       Debug logger (singleton, gated by platform.IsDebugEnabled())
+       ├→ internal/provider/     AI provider interface + Anthropic implementation
+       ├→ internal/messenger/    Messenger interface
+       │    └→ telegram/         Telegram bot: handlers, chat, pairing, inline keyboards
+       └→ internal/chat/         Chat session manager + Claude runner (--session-id)
 ```
 
-### Two modes of operation
+### Three modes of operation
 
-1. **Interactive TUI** (`scheduler` with no args): `root.go:runMainMenu()` runs a loop → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
-
+1. **Interactive TUI** (`scheduler` with no args): `root.go:runMainMenu()` loops → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
 2. **CLI subcommands** (`scheduler add`, `scheduler list`, etc.): Each `internal/cmd/*.go` registers a Cobra command.
+3. **Telegram bot** (inside daemon): Runs alongside cron in `scheduler start`. Handles `/new`, `/jobs`, `/model`, `/effort`, `/status`, `/help` commands + free-text chat with Claude.
 
-Shared logic in the `cmd` package as unexported functions so both modes reuse the same code.
+Shared logic lives in the `cmd` package as unexported functions so both modes reuse the same code.
 
 ### Key data flows
 
+**First-run setup:** `rootCmd.PersistentPreRunE` checks `platform.IsSetupComplete()` → if false, runs `runSetupWizard()` → detects provider → configures messenger/chat/daemon → copies `.workspace/` to config dir → saves `settings.json`.
+
 **Job creation:** `cmd/add.go` → TUI wizard or CLI flags → writes `prompts/<name>.md` + `schedules/<name>.yml`. Duplicate names validated in both paths.
 
-**Job execution:** `executor.Run()` → timeout via `context.WithTimeout` → `BuildCommand(ctx)` reads prompt → prepends embedded task preamble → appends optional summary injection → pipes prompt via stdin to `claude -p [flags]` → sets `CLAUDE_CODE_EFFORT_LEVEL` env var → passes `--max-turns`, `--output-format json`, context flags → captures stdout/stderr to log files → parses JSON for cost/usage → writes to SQLite
+**Job execution:** `executor.Run()` → timeout via `context.WithTimeout` → `BuildCommand(ctx)` reads prompt → prepends embedded `task-preamble.txt` → appends optional `summary-prompt.txt` injection → pipes prompt via stdin to `claude -p [flags]` → passes `--effort`, `--permission-mode bypassPermissions`, `--output-format json` → captures stdout/stderr to log files → parses JSON for cost/usage → writes to SQLite.
 
-**Daemon:** `daemon.Run()` → PID file → SQLite → loads configs → cron entries (`SkipIfStillRunning`) → fsnotify watcher → blocks on SIGINT/SIGTERM → graceful shutdown
+**Daemon:** `daemon.Run()` → PID file → SQLite → loads configs → cron entries (`SkipIfStillRunning`) → starts Telegram bot (if configured) → fsnotify watcher → blocks on SIGINT/SIGTERM → stops bot → stops cron → graceful shutdown.
 
-**Hot-reload:** fsnotify → 500ms debounce → `Reload()` holds mutex for entire operation: clears and re-registers all jobs atomically
+**Telegram chat:** User sends text → `handleChatMessage()` → per-user lock (prevents concurrent processing) → `sessionManager.GetOrCreateSession()` → starts typing indicator loop → `chat.Runner.Run()` executes `claude -p --session-id <uuid>` → logs to SQLite → sends response to Telegram + echoes to terminal.
 
-### Important defaults
+**Hot-reload:** fsnotify → 500ms debounce → `Reload()` holds mutex for entire operation: clears and re-registers all jobs atomically.
 
-| Field | Default | Notes |
-|-------|---------|-------|
-| `permission_mode` | `bypassPermissions` | Jobs run unattended |
-| `timeout` | `300` | 5 minutes |
-| `max_budget_usd` | `0` | Unlimited |
-| `max_turns` | `0` | Unlimited |
+### Settings (platform/settings.go)
+
+```go
+Settings {
+    Debug, SetupComplete bool
+    Provider   { ID string }                          // "anthropic"
+    Messenger  { Type, BotToken, Pairing, AllowedUsers }  // "telegram"
+    Chat       { Model, Effort }                      // defaults for chat sessions
+    DaemonMode string                                 // "background" | "service"
+}
+```
+
+### Database tables (storage/db.go)
+
+- `execution_logs` — job execution records (status, cost, tokens, timestamps)
+- `chat_sessions` — maps Telegram userID → session UUID for `--session-id`
+- `chat_messages` — logged chat messages for visibility (terminal echo, `scheduler logs`)
+
+### JobConfig fields (config/job.go)
+
+`ID`, `Name`, `Schedule`, `WorkingDir`, `PromptFile`, `Model`, `Timeout`, `Effort`, `SummaryEnabled`, `NoSessionPersist`, `Enabled`
+
+### Hardcoded execution defaults
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| `permission_mode` | `bypassPermissions` | Always — jobs run unattended |
+| `output_format` | `json` | Always — for structured parsing |
+| `no_session_persistence` | `true` | Default in wizard |
+| `timeout` | `300` | 5 minutes default |
 | `effort` | (empty = high) | Claude Code default |
-| `output_format` | `json` | Hardcoded, not configurable |
-| `summary_enabled` | `false` | Optional Telegram-style summary |
-| `no_session_persistence` | `true` | Hardcoded |
-| Context | All enabled | `disable_*` flags control sources |
+| `summary_enabled` | `false` | Optional summary injection |
 
 ### Platform support
 
 | Platform | PID detection | Config path |
 |----------|--------------|-------------|
-| **Windows** | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\cli-scheduler\` |
-| **Linux** | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` or `$XDG_CONFIG_HOME/cli-scheduler/` |
-| **macOS** | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` |
+| Windows | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\cli-scheduler\` |
+| Linux | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` or `$XDG_CONFIG_HOME/cli-scheduler/` |
+| macOS | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` |
 
 ### Runtime config directory
 
 ```
-~/.cli-scheduler/          (Linux/macOS)
-%APPDATA%\cli-scheduler\   (Windows)
-  ├── schedules/            # One YAML per job
-  ├── prompts/              # One .md per job (prompt content)
-  ├── system-prompts/       # Reusable system prompts (advanced)
-  ├── logs/                 # stdout (.json) / stderr (.log) per execution
-  ├── summary/              # Execution summaries
-  ├── data/scheduler.db     # SQLite (WAL mode)
-  └── scheduler.pid         # Daemon lock file
+<BaseDir>/
+  ├── schedules/          # One YAML per job
+  ├── prompts/            # One .md per job (prompt content)
+  ├── logs/               # stdout (.json) / stderr (.log) per execution
+  ├── summary/            # Execution summaries (when summary_enabled)
+  ├── workspace/          # CLAUDE.md + .claude/ (copied from .workspace/ during setup)
+  ├── data/scheduler.db   # SQLite (WAL mode)
+  ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
+  └── scheduler.pid       # Daemon lock file
 ```
 
-### SQLite schema (execution_logs)
+### Telegram bot architecture
 
-Core: `id`, `job_id`, `job_name`, `started_at`, `finished_at`, `exit_code`, `stdout_path`, `stderr_path`, `status`, `trigger_type`, `error_msg`
+Bot runs inside the daemon (`scheduler start`). Single process — no IPC needed.
 
-Usage: `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`
+**Commands:** `/new` (clear session), `/jobs` (inline keyboard job list), `/model` (inline keyboard model picker), `/effort` (inline keyboard effort picker), `/status` (daemon + session info), `/help`
 
-Usage columns auto-migrated via `ALTER TABLE ADD COLUMN` (idempotent).
+**Chat flow:** Text message → auth check → per-user mutex → get/create session → typing indicator loop (5s refresh) → `claude -p --session-id <uuid>` → parse JSON → send response + log to SQLite + echo to terminal
+
+**Session management:** `chat_sessions` maps Telegram userID → UUID. The UUID is passed as `--session-id` to Claude Code, which manages conversation history internally. `/new` deactivates current session and creates a fresh UUID.
+
+**Authorization:** Two pairing modes: `gatherToken` (generate code, send to bot to verify) or `allowList` (manually enter user IDs/@usernames).
 
 ### Concurrency model
 
 - `sync.Mutex` protects daemon's job map during hot-reload (held for entire operation)
 - `cron.SkipIfStillRunning` prevents overlapping execution of the same job
+- `sync.Map` per-user processing lock prevents concurrent Telegram message handling
 - SQLite WAL mode with 5s busy timeout
 - Each job runs as isolated subprocess via `exec.CommandContext`
 - `Watcher.Stop()` uses `sync.Once` to prevent double-close panic
 
----
+## Gotchas
 
-## Build & Test
-
-```bash
-# Build
-go build -o build/scheduler ./cmd/scheduler/
-
-# Build all packages (compile check)
-go build ./...
-
-# Run tests
-go test ./...
-
-# Tidy dependencies
-go mod tidy
-
-# Cross-compile
-GOOS=linux GOARCH=amd64 go build -o build/scheduler-linux-amd64 ./cmd/scheduler/
-GOOS=darwin GOARCH=arm64 go build -o build/scheduler-darwin-arm64 ./cmd/scheduler/
-```
+- **Embedded files:** `executor/task-preamble.txt` and `executor/summary-prompt.txt` are `//go:embed`-ed — changes require rebuild
+- **Prompt piped via stdin:** Prompt content is passed via stdin (not CLI args) to avoid OS argument length limits and process list exposure
+- **TUI library:** Uses `charmbracelet/huh` for forms and `lipgloss` for styling — Catppuccin Mocha color palette (`#cba6f7` purple, `#a6e3a1` green, `#f38ba8` red, `#fab387` orange, `#6c7086` dim)
+- **Debug logging:** Gated by `settings.json` — only writes to `logs/scheduler-debug.log` when `platform.IsDebugEnabled()` returns true
+- **Job name validation:** Alphanumeric + hyphens + underscores only
+- **Prompt file security:** Must be relative path, no `..` traversal, no absolute paths
+- **Model validation:** Only allows `sonnet`, `opus`, `haiku` and their full model IDs
+- **First-run detection:** `PersistentPreRunE` on rootCmd checks `IsSetupComplete()` — skips for `setup`, `help`, `version` commands
+- **Chat timeout:** 120s for chat messages (vs 300s default for scheduled jobs)
+- **Telegram bot token:** Stored in `settings.json` — not committed to git

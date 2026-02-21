@@ -5,11 +5,23 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
+
+// normalizeWorkingDir fixes bare Windows drive letters ("D:" → "D:\").
+// On Windows, "D:" means "current directory on drive D", not the drive root.
+// YAML round-tripping can strip the trailing backslash, so we restore it here.
+func normalizeWorkingDir(dir string) string {
+	if runtime.GOOS == "windows" && len(dir) == 2 && dir[1] == ':' &&
+		((dir[0] >= 'A' && dir[0] <= 'Z') || (dir[0] >= 'a' && dir[0] <= 'z')) {
+		return dir + `\`
+	}
+	return dir
+}
 
 // LoadJob reads a single YAML job config file.
 func LoadJob(path string) (*JobConfig, error) {
@@ -22,6 +34,8 @@ func LoadJob(path string) (*JobConfig, error) {
 	if err := yaml.Unmarshal(data, &job); err != nil {
 		return nil, fmt.Errorf("parsing job config %s: %w", path, err)
 	}
+
+	job.WorkingDir = normalizeWorkingDir(job.WorkingDir)
 
 	return &job, nil
 }
@@ -62,6 +76,8 @@ func SaveJob(schedulesDir string, job *JobConfig) error {
 	if job.ID == "" {
 		job.ID = uuid.New().String()[:8]
 	}
+
+	job.WorkingDir = normalizeWorkingDir(job.WorkingDir)
 
 	data, err := yaml.Marshal(job)
 	if err != nil {

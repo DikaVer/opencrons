@@ -42,11 +42,11 @@ func runList(cmd *cobra.Command, args []string) error {
 		headerStyle.Width(20).Render("NAME"),
 		headerStyle.Width(18).Render("SCHEDULE"),
 		headerStyle.Width(10).Render("MODEL"),
-		headerStyle.Width(16).Render("MODE"),
+		headerStyle.Width(10).Render("EFFORT"),
 		headerStyle.Width(8).Render("STATUS"),
 	)
 
-	fmt.Println(dimStyle.Render("  "+strings.Repeat("-", 76)))
+	fmt.Println(dimStyle.Render("  "+strings.Repeat("-", 70)))
 
 	for _, job := range jobs {
 		status := enabledStyle.Render("enabled")
@@ -54,11 +54,16 @@ func runList(cmd *cobra.Command, args []string) error {
 			status = disabledStyle.Render("disabled")
 		}
 
-		fmt.Fprintf(os.Stdout, "  %-20s  %-18s  %-10s  %-16s  %s\n",
+		effort := job.Effort
+		if effort == "" {
+			effort = "high"
+		}
+
+		fmt.Fprintf(os.Stdout, "  %-20s  %-18s  %-10s  %-10s  %s\n",
 			truncate(job.Name, 20),
 			truncate(job.Schedule, 18),
 			truncate(job.Model, 10),
-			truncate(job.PermissionMode, 16),
+			effort,
 			status,
 		)
 	}

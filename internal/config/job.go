@@ -11,27 +11,17 @@ import (
 
 // JobConfig represents a single scheduled job configuration.
 type JobConfig struct {
-	ID                    string   `yaml:"id"`
-	Name                  string   `yaml:"name"`
-	Schedule              string   `yaml:"schedule"`
-	WorkingDir            string   `yaml:"working_dir"`
-	PromptFile            string   `yaml:"prompt_file"`
-	Model                 string   `yaml:"model,omitempty"`
-	PermissionMode       string   `yaml:"permission_mode,omitempty"`
-	MaxBudgetUSD         float64  `yaml:"max_budget_usd,omitempty"`
-	MaxTurns             int      `yaml:"max_turns,omitempty"`
-	Timeout              int      `yaml:"timeout,omitempty"`
-	Effort               string   `yaml:"effort,omitempty"`
-	AddDirs              []string `yaml:"add_dirs,omitempty"`
-	MCPConfig             string   `yaml:"mcp_config,omitempty"`
-	NoSessionPersistence  bool     `yaml:"no_session_persistence,omitempty"`
-	SummaryEnabled        bool     `yaml:"summary_enabled,omitempty"`
-	DisableProjectMemory  bool     `yaml:"disable_project_memory,omitempty"`
-	DisableUserMemory     bool     `yaml:"disable_user_memory,omitempty"`
-	DisableLocalMemory    bool     `yaml:"disable_local_memory,omitempty"`
-	DisableAutoMemory     bool     `yaml:"disable_auto_memory,omitempty"`
-	DisableSkills         bool     `yaml:"disable_skills,omitempty"`
-	Enabled               bool     `yaml:"enabled"`
+	ID               string `yaml:"id"`
+	Name             string `yaml:"name"`
+	Schedule         string `yaml:"schedule"`
+	WorkingDir       string `yaml:"working_dir"`
+	PromptFile       string `yaml:"prompt_file"`
+	Model            string `yaml:"model,omitempty"`
+	Timeout          int    `yaml:"timeout,omitempty"`
+	Effort           string `yaml:"effort,omitempty"`
+	SummaryEnabled   bool   `yaml:"summary_enabled,omitempty"`
+	NoSessionPersist bool   `yaml:"no_session_persistence,omitempty"`
+	Enabled          bool   `yaml:"enabled"`
 }
 
 // Validate checks that all required fields are present and valid.
@@ -83,16 +73,6 @@ func (j *JobConfig) Validate() error {
 		}
 	}
 
-	// Validate permission mode if specified
-	if j.PermissionMode != "" {
-		validModes := map[string]bool{
-			"plan": true, "default": true, "bypassPermissions": true,
-		}
-		if !validModes[j.PermissionMode] {
-			return fmt.Errorf("job %q: unknown permission_mode %q", j.Name, j.PermissionMode)
-		}
-	}
-
 	// Validate effort if specified
 	if j.Effort != "" {
 		validEfforts := map[string]bool{
@@ -101,16 +81,6 @@ func (j *JobConfig) Validate() error {
 		if !validEfforts[j.Effort] {
 			return fmt.Errorf("job %q: unknown effort %q (valid: low, medium, high, max)", j.Name, j.Effort)
 		}
-	}
-
-	// Validate budget
-	if j.MaxBudgetUSD < 0 {
-		return fmt.Errorf("job %q: max_budget_usd cannot be negative", j.Name)
-	}
-
-	// Validate max turns
-	if j.MaxTurns < 0 {
-		return fmt.Errorf("job %q: max_turns cannot be negative", j.Name)
 	}
 
 	// Validate timeout
@@ -129,4 +99,3 @@ func (j *JobConfig) ValidatePromptFileExists(promptsDir string) error {
 	}
 	return nil
 }
-

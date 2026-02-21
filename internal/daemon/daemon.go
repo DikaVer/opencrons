@@ -9,8 +9,11 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dika-maulidal/cli-scheduler/internal/chat"
 	"github.com/dika-maulidal/cli-scheduler/internal/config"
 	"github.com/dika-maulidal/cli-scheduler/internal/executor"
+	"github.com/dika-maulidal/cli-scheduler/internal/logger"
+	"github.com/dika-maulidal/cli-scheduler/internal/messenger/telegram"
 	"github.com/dika-maulidal/cli-scheduler/internal/platform"
 	"github.com/dika-maulidal/cli-scheduler/internal/storage"
 	"github.com/robfig/cron/v3"
@@ -24,11 +27,12 @@ type Daemon struct {
 	jobs    map[string]cron.EntryID // job name -> cron entry ID
 	mu      sync.Mutex
 	logger  *log.Logger
+	tgBot   *telegram.Bot
 }
 
 // Run starts the daemon in the foreground.
 func Run() error {
-	logger := log.New(os.Stdout, "[scheduler] ", log.LstdFlags)
+	stdlog := log.New(os.Stdout, "[scheduler] ", log.LstdFlags)
 
 	if err := platform.EnsureDirs(); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
@@ -54,7 +58,7 @@ func Run() error {
 		),
 		db:     db,
 		jobs:   make(map[string]cron.EntryID),
-		logger: logger,
+		logger: stdlog,
 	}
 
 	// Load and register jobs
@@ -65,27 +69,66 @@ func Run() error {
 	// Start file watcher for hot-reload
 	watcher, err := NewWatcher(platform.SchedulesDir(), d)
 	if err != nil {
-		logger.Printf("Warning: file watcher failed to start: %v", err)
+		stdlog.Printf("Warning: file watcher failed to start: %v", err)
 	} else {
 		d.watcher = watcher
 		go watcher.Start()
 		defer watcher.Stop()
 	}
 
+	// Start Telegram bot if configured
+	msgCfg := platform.GetMessengerConfig()
+	if msgCfg != nil && msgCfg.Type == "telegram" {
+		if err := d.startTelegramBot(db, msgCfg, stdlog); err != nil {
+			stdlog.Printf("Warning: Telegram bot failed to start: %v", err)
+			logger.Debug("Telegram bot start error: %v", err)
+		}
+	}
+
 	// Start cron
 	d.cron.Start()
-	logger.Printf("Daemon started (PID %d), %d job(s) loaded", os.Getpid(), len(d.jobs))
+	d.logger.Printf("Daemon started (PID %d), %d job(s) loaded", os.Getpid(), len(d.jobs))
+	logger.Info("Daemon started (PID %d), %d job(s) loaded", os.Getpid(), len(d.jobs))
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigCh
 
-	logger.Printf("Received %s, shutting down...", sig)
+	d.logger.Printf("Received %s, shutting down...", sig)
+	logger.Info("Received %s, shutting down...", sig)
+
+	// Stop Telegram bot first
+	if d.tgBot != nil {
+		d.tgBot.Stop()
+	}
+
 	ctx := d.cron.Stop()
 	<-ctx.Done()
-	logger.Println("Daemon stopped.")
+	d.logger.Println("Daemon stopped.")
+	logger.Info("Daemon stopped")
 
+	return nil
+}
+
+// startTelegramBot initializes and starts the Telegram bot in a goroutine.
+func (d *Daemon) startTelegramBot(db *storage.DB, msgCfg *platform.MessengerSettings, stdlog *log.Logger) error {
+	tgBot, err := telegram.New(db, msgCfg, stdlog)
+	if err != nil {
+		return err
+	}
+
+	// Set up chat components
+	sessionMgr := chat.NewSessionManager(db)
+	runner := chat.NewRunner()
+	tgBot.SetChatComponents(sessionMgr, runner)
+
+	d.tgBot = tgBot
+
+	// Start bot in background goroutine
+	go tgBot.Start(context.Background())
+
+	stdlog.Println("Telegram bot started")
 	return nil
 }
 
@@ -125,17 +168,25 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 
 	// Capture job for closure
 	j := job
+	tgBot := d.tgBot
 
 	entryID, err := d.cron.AddFunc(j.Schedule, func() {
 		d.logger.Printf("Executing job %q", j.Name)
+		logger.Debug("Daemon executing job %q", j.Name)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		result, err := executor.Run(ctx, d.db, j, "scheduled")
 		if err != nil {
 			d.logger.Printf("Job %q execution error: %v", j.Name, err)
+			logger.Debug("Daemon job %q error: %v", j.Name, err)
 			return
 		}
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
+
+		// Notify via Telegram if bot is running
+		if tgBot != nil {
+			tgBot.NotifyJobComplete(ctx, j.Name, result.Status)
+		}
 	})
 	if err != nil {
 		return fmt.Errorf("adding cron entry: %w", err)
@@ -149,6 +200,7 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 // Reload reloads all job configurations.
 func (d *Daemon) Reload() {
 	d.logger.Println("Reloading job configurations...")
+	logger.Debug("Hot-reload triggered")
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -177,4 +229,5 @@ func (d *Daemon) Reload() {
 	}
 
 	d.logger.Printf("Reload complete: %d job(s) loaded", len(d.jobs))
+	logger.Debug("Hot-reload complete: %d job(s) loaded", len(d.jobs))
 }

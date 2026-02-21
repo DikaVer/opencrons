@@ -30,11 +30,6 @@ func PromptsDir() string {
 	return filepath.Join(BaseDir(), "prompts")
 }
 
-// SystemPromptsDir returns the path to the system-prompts directory.
-func SystemPromptsDir() string {
-	return filepath.Join(BaseDir(), "system-prompts")
-}
-
 // LogsDir returns the path to the logs directory (stdout/stderr capture).
 func LogsDir() string {
 	return filepath.Join(BaseDir(), "logs")
@@ -60,16 +55,21 @@ func PIDFile() string {
 	return filepath.Join(BaseDir(), "scheduler.pid")
 }
 
+// WorkspaceDir returns the path to the workspace directory (CLAUDE.md + .claude/).
+func WorkspaceDir() string {
+	return filepath.Join(BaseDir(), "workspace")
+}
+
 // EnsureDirs creates all required directories if they don't exist.
 func EnsureDirs() error {
 	dirs := []string{
 		BaseDir(),
 		SchedulesDir(),
 		PromptsDir(),
-		SystemPromptsDir(),
 		LogsDir(),
 		SummaryDir(),
 		DataDir(),
+		WorkspaceDir(),
 	}
 
 	for _, dir := range dirs {

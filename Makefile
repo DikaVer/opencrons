@@ -34,11 +34,5 @@ lint:
 
 install-skill:
 	@mkdir -p $(HOME)/.claude/skills/schedule
-	cp .agents/skills/schedule/SKILL.md $(HOME)/.claude/skills/schedule/SKILL.md
+	cp .workspace/.agents/skills/schedule/SKILL.md $(HOME)/.claude/skills/schedule/SKILL.md
 	@echo "Skill installed to ~/.claude/skills/schedule/SKILL.md"
-
-install-agents: install-skill
-	@if [ -f AGENTS.md ]; then \
-		mkdir -p $(HOME)/.claude/skills/schedule; \
-		echo "Agents config installed."; \
-	fi

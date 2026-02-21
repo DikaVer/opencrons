@@ -21,7 +21,22 @@ var rootCmd = &cobra.Command{
 	Use:   "scheduler",
 	Short: "CLI scheduler for Claude Code automation",
 	Long:  "A scheduler that runs Claude Code tasks on a cron schedule with secure, predefined execution environments.",
-	RunE:  runMainMenu,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Skip setup check for these commands
+		name := cmd.Name()
+		if name == "setup" || name == "help" || name == "version" {
+			return nil
+		}
+
+		if !platform.IsSetupComplete() {
+			fmt.Println()
+			fmt.Println("  First-time setup required. Starting setup wizard...")
+			fmt.Println()
+			return runSetupWizard()
+		}
+		return nil
+	},
+	RunE: runMainMenu,
 }
 
 func Execute() error {
@@ -61,6 +76,9 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 
 		case tui.MenuDaemonControl:
 			handleDaemonMenu()
+
+		case tui.MenuSettings:
+			handleSettingsMenu()
 
 		case tui.MenuExit:
 			return nil
@@ -433,6 +451,30 @@ func truncateStr(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen-1]) + "…"
+}
+
+func handleDebugMenu() {
+	current := platform.IsDebugEnabled()
+	newState, err := tui.RunDebugMenu(current)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+		tui.PrintPressEnter()
+		return
+	}
+
+	if newState != current {
+		if err := platform.SetDebug(newState); err != nil {
+			fmt.Fprintf(os.Stderr, "  Error saving settings: %v\n", err)
+		} else if newState {
+			fmt.Println("  Debug logging enabled.")
+			fmt.Printf("  Logs: %s/scheduler-debug.log\n", platform.LogsDir())
+		} else {
+			fmt.Println("  Debug logging disabled.")
+		}
+	} else {
+		fmt.Println("  No change.")
+	}
+	tui.PrintPressEnter()
 }
 
 func handleDaemonMenu() {

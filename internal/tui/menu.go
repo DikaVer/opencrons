@@ -20,6 +20,7 @@ const (
 	MenuRunJob
 	MenuViewLogs
 	MenuDaemonControl
+	MenuSettings
 	MenuExit
 )
 
@@ -67,6 +68,7 @@ func RunMainMenu() (MenuAction, error) {
 					huh.NewOption("Run job now             Execute a job immediately", int(MenuRunJob)),
 					huh.NewOption("View logs               See execution history", int(MenuViewLogs)),
 					huh.NewOption("Daemon                  Start, stop, or check daemon status", int(MenuDaemonControl)),
+					huh.NewOption("Settings                Manage provider, messenger, and preferences", int(MenuSettings)),
 					huh.NewOption("Exit", int(MenuExit)),
 				).
 				Value(&choice),
@@ -316,6 +318,12 @@ func printQuickStatus() {
 	}
 	fmt.Printf("    %s %d total, %d enabled", dimStyle.Render("Jobs:"), len(jobs), enabledCount)
 
+	// Messenger status
+	msgCfg := platform.GetMessengerConfig()
+	if msgCfg != nil {
+		fmt.Printf("    %s %s", dimStyle.Render("Chat:"), successStyle.Render(msgCfg.Type))
+	}
+
 	// Next run
 	if enabledCount > 0 {
 		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
@@ -342,6 +350,43 @@ func printQuickStatus() {
 		}
 	}
 	fmt.Println()
+}
+
+// RunDebugMenu shows the debug toggle menu.
+func RunDebugMenu(debugEnabled bool) (bool, error) {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#cba6f7"))
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
+	failStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+
+	fmt.Println()
+	fmt.Println(titleStyle.Render("  Debug Logging"))
+	fmt.Println()
+
+	if debugEnabled {
+		fmt.Printf("  Current state: %s\n", successStyle.Render("on"))
+	} else {
+		fmt.Printf("  Current state: %s\n", failStyle.Render("off"))
+	}
+	fmt.Println(dimStyle.Render("  When enabled, detailed logs are written to logs/scheduler-debug.log"))
+	fmt.Println()
+
+	action := "toggle"
+	if debugEnabled {
+		action = "Disable debug logging"
+	} else {
+		action = "Enable debug logging"
+	}
+
+	confirmed, err := ConfirmAction(action, "")
+	if err != nil {
+		return debugEnabled, err
+	}
+
+	if confirmed {
+		return !debugEnabled, nil
+	}
+	return debugEnabled, nil
 }
 
 // PrintPressEnter prints a "press Enter to continue" prompt and waits.

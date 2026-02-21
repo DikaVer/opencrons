@@ -73,6 +73,36 @@ func (db *DB) migrate() error {
 		db.conn.Exec(m)
 	}
 
+	// Chat sessions and messages tables
+	chatSchema := `
+	CREATE TABLE IF NOT EXISTS chat_sessions (
+		id          TEXT PRIMARY KEY,
+		user_id     INTEGER NOT NULL,
+		chat_id     INTEGER NOT NULL,
+		model       TEXT NOT NULL DEFAULT 'sonnet',
+		effort      TEXT NOT NULL DEFAULT 'high',
+		working_dir TEXT NOT NULL,
+		active      BOOLEAN NOT NULL DEFAULT 1,
+		created_at  DATETIME NOT NULL,
+		updated_at  DATETIME NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON chat_sessions(user_id, active);
+
+	CREATE TABLE IF NOT EXISTS chat_messages (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		session_id TEXT NOT NULL REFERENCES chat_sessions(id),
+		role       TEXT NOT NULL CHECK (role IN ('user','assistant')),
+		content    TEXT NOT NULL,
+		cost_usd   REAL DEFAULT 0,
+		tokens     INTEGER DEFAULT 0,
+		created_at DATETIME NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id);
+	`
+	if _, err := db.conn.Exec(chatSchema); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -201,6 +231,146 @@ func (db *DB) GetTotalUsage() (*UsageSummary, error) {
 		return nil, fmt.Errorf("querying total usage: %w", err)
 	}
 	return &s, nil
+}
+
+// CreateSession inserts a new chat session.
+func (db *DB) CreateSession(session *ChatSession) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO chat_sessions (id, user_id, chat_id, model, effort, working_dir, active, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		session.ID, session.UserID, session.ChatID, session.Model, session.Effort,
+		session.WorkingDir, session.Active, session.CreatedAt, session.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("creating session: %w", err)
+	}
+	return nil
+}
+
+// GetActiveSession returns the active chat session for a user, or nil if none.
+func (db *DB) GetActiveSession(userID int64) (*ChatSession, error) {
+	row := db.conn.QueryRow(
+		`SELECT id, user_id, chat_id, model, effort, working_dir, active, created_at, updated_at
+		 FROM chat_sessions
+		 WHERE user_id = ? AND active = 1
+		 ORDER BY updated_at DESC
+		 LIMIT 1`,
+		userID,
+	)
+
+	var s ChatSession
+	err := row.Scan(&s.ID, &s.UserID, &s.ChatID, &s.Model, &s.Effort,
+		&s.WorkingDir, &s.Active, &s.CreatedAt, &s.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("querying active session: %w", err)
+	}
+	return &s, nil
+}
+
+// DeactivateUserSessions marks all sessions for a user as inactive.
+func (db *DB) DeactivateUserSessions(userID int64) error {
+	_, err := db.conn.Exec(
+		`UPDATE chat_sessions SET active = 0, updated_at = ? WHERE user_id = ? AND active = 1`,
+		time.Now(), userID,
+	)
+	if err != nil {
+		return fmt.Errorf("deactivating sessions: %w", err)
+	}
+	return nil
+}
+
+// TouchSession updates the session's updated_at timestamp.
+func (db *DB) TouchSession(sessionID string) error {
+	_, err := db.conn.Exec(
+		`UPDATE chat_sessions SET updated_at = ? WHERE id = ?`,
+		time.Now(), sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("touching session: %w", err)
+	}
+	return nil
+}
+
+// UpdateSessionModel updates the model for a session.
+func (db *DB) UpdateSessionModel(sessionID, model string) error {
+	_, err := db.conn.Exec(
+		`UPDATE chat_sessions SET model = ?, updated_at = ? WHERE id = ?`,
+		model, time.Now(), sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("updating session model: %w", err)
+	}
+	return nil
+}
+
+// UpdateSessionEffort updates the effort for a session.
+func (db *DB) UpdateSessionEffort(sessionID, effort string) error {
+	_, err := db.conn.Exec(
+		`UPDATE chat_sessions SET effort = ?, updated_at = ? WHERE id = ?`,
+		effort, time.Now(), sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("updating session effort: %w", err)
+	}
+	return nil
+}
+
+// AddChatLog inserts a chat message log entry.
+func (db *DB) AddChatLog(sessionID, role, content string, costUSD float64, tokens int) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO chat_messages (session_id, role, content, cost_usd, tokens, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		sessionID, role, content, costUSD, tokens, time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("adding chat log: %w", err)
+	}
+	return nil
+}
+
+// GetChatLogs returns chat messages for a session, ordered by creation time.
+func (db *DB) GetChatLogs(sessionID string, limit int) ([]ChatMessage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := db.conn.Query(
+		`SELECT id, session_id, role, content, cost_usd, tokens, created_at
+		 FROM chat_messages
+		 WHERE session_id = ?
+		 ORDER BY created_at DESC
+		 LIMIT ?`,
+		sessionID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying chat logs: %w", err)
+	}
+	defer rows.Close()
+
+	var messages []ChatMessage
+	for rows.Next() {
+		var m ChatMessage
+		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Content, &m.CostUSD, &m.Tokens, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning chat message: %w", err)
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// DeactivateStaleSessions deactivates sessions idle for more than the given duration.
+func (db *DB) DeactivateStaleSessions(maxIdle time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-maxIdle)
+	result, err := db.conn.Exec(
+		`UPDATE chat_sessions SET active = 0 WHERE active = 1 AND updated_at < ?`,
+		cutoff,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("deactivating stale sessions: %w", err)
+	}
+	return result.RowsAffected()
 }
 
 func scanLogs(rows *sql.Rows) ([]ExecutionLog, error) {

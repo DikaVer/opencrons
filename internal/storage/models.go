@@ -31,3 +31,27 @@ type UsageSummary struct {
 	TotalCacheRead      int     `json:"total_cache_read_tokens"`
 	TotalCacheCreation  int     `json:"total_cache_creation_tokens"`
 }
+
+// ChatSession represents a chat session between a user and Claude.
+type ChatSession struct {
+	ID         string    `json:"id"`          // UUID, also used as claude --session-id
+	UserID     int64     `json:"user_id"`     // Telegram user ID
+	ChatID     int64     `json:"chat_id"`     // Telegram chat ID
+	Model      string    `json:"model"`       // sonnet, opus, haiku
+	Effort     string    `json:"effort"`      // low, medium, high, max
+	WorkingDir string    `json:"working_dir"`
+	Active     bool      `json:"active"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// ChatMessage represents a logged chat message for visibility.
+type ChatMessage struct {
+	ID        int64     `json:"id"`
+	SessionID string    `json:"session_id"`
+	Role      string    `json:"role"` // "user" or "assistant"
+	Content   string    `json:"content"`
+	CostUSD   float64   `json:"cost_usd"`
+	Tokens    int       `json:"tokens"`
+	CreatedAt time.Time `json:"created_at"`
+}

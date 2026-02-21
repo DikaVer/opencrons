@@ -30,14 +30,8 @@ func init() {
 	addCmd.Flags().String("prompt-content", "", "prompt content (written to prompt file)")
 	addCmd.Flags().String("model", "sonnet", "Claude model: sonnet, opus, haiku")
 	addCmd.Flags().String("effort", "", "effort level: low, medium, high (default), max")
-	addCmd.Flags().String("permission-mode", "bypassPermissions", "permission mode: plan, default, bypassPermissions")
-	addCmd.Flags().Float64("max-budget", 0, "max budget in USD (0 = unlimited)")
-	addCmd.Flags().Int("max-turns", 0, "max agentic turns (0 = unlimited)")
 	addCmd.Flags().Int("timeout", 300, "timeout in seconds")
-	addCmd.Flags().StringSlice("add-dir", nil, "additional directories (repeatable)")
-	addCmd.Flags().String("mcp-config", "", "MCP config file path")
 	addCmd.Flags().Bool("summary", false, "enable Telegram-style summary after each run")
-	addCmd.Flags().String("context", "all", "context sources: all, none, or comma-separated (project_memory,user_memory,local_memory,auto_memory,skills)")
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -85,15 +79,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	promptContent, _ := cmd.Flags().GetString("prompt-content")
 	model, _ := cmd.Flags().GetString("model")
 	effort, _ := cmd.Flags().GetString("effort")
-	permMode, _ := cmd.Flags().GetString("permission-mode")
-	maxBudget, _ := cmd.Flags().GetFloat64("max-budget")
-	maxTurns, _ := cmd.Flags().GetInt("max-turns")
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	workingDir, _ := cmd.Flags().GetString("working-dir")
-	addDirs, _ := cmd.Flags().GetStringSlice("add-dir")
-	mcpConfig, _ := cmd.Flags().GetString("mcp-config")
 	summaryEnabled, _ := cmd.Flags().GetBool("summary")
-	contextStr, _ := cmd.Flags().GetString("context")
 
 	// Validate required flags
 	var missing []string
@@ -132,48 +120,18 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		}
 	}
 
-	// Parse context sources
-	var disableProjectMemory, disableUserMemory, disableLocalMemory, disableAutoMemory, disableSkills bool
-	switch contextStr {
-	case "all", "":
-		// All enabled (default)
-	case "none":
-		disableProjectMemory = true
-		disableUserMemory = true
-		disableLocalMemory = true
-		disableAutoMemory = true
-		disableSkills = true
-	default:
-		sources := strings.Split(contextStr, ",")
-		disableProjectMemory = !contains(sources, "project_memory")
-		disableUserMemory = !contains(sources, "user_memory")
-		disableLocalMemory = !contains(sources, "local_memory")
-		disableAutoMemory = !contains(sources, "auto_memory")
-		disableSkills = !contains(sources, "skills")
-	}
-
 	job := &config.JobConfig{
-		ID:                   uuid.New().String()[:8],
-		Name:                 name,
-		Schedule:             schedule,
-		WorkingDir:           workingDir,
-		PromptFile:           promptFile,
-		Model:                model,
-		Effort:               effort,
-		PermissionMode:       permMode,
-		MaxBudgetUSD:         maxBudget,
-		MaxTurns:             maxTurns,
-		Timeout:              timeout,
-		AddDirs:              addDirs,
-		MCPConfig:            mcpConfig,
-		SummaryEnabled:       summaryEnabled,
-		DisableProjectMemory: disableProjectMemory,
-		DisableUserMemory:    disableUserMemory,
-		DisableLocalMemory:   disableLocalMemory,
-		DisableAutoMemory:    disableAutoMemory,
-		DisableSkills:        disableSkills,
-		NoSessionPersistence: true,
-		Enabled:              true,
+		ID:               uuid.New().String()[:8],
+		Name:             name,
+		Schedule:         schedule,
+		WorkingDir:       workingDir,
+		PromptFile:       promptFile,
+		Model:            model,
+		Effort:           effort,
+		Timeout:          timeout,
+		SummaryEnabled:   summaryEnabled,
+		NoSessionPersist: true,
+		Enabled:          true,
 	}
 
 	// Validate the job config (catches invalid model, effort, cron, etc.)
@@ -194,21 +152,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	if effort != "" {
 		fmt.Printf("  Effort:   %s\n", effort)
 	}
-	if maxTurns > 0 {
-		fmt.Printf("  MaxTurns: %d\n", maxTurns)
-	}
 	fmt.Printf("  Timeout:  %ds\n", timeout)
 	if summaryEnabled {
 		fmt.Printf("  Summary:  enabled\n")
 	}
 	return nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

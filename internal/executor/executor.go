@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dika-maulidal/cli-scheduler/internal/config"
+	"github.com/dika-maulidal/cli-scheduler/internal/logger"
 	"github.com/dika-maulidal/cli-scheduler/internal/platform"
 	"github.com/dika-maulidal/cli-scheduler/internal/storage"
 )
@@ -42,6 +43,15 @@ type Result struct {
 
 // Run executes a job and logs the result to the database.
 func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType string) (*Result, error) {
+	logger.Debug("Starting job %q (trigger=%s, dir=%s)", job.Name, triggerType, job.WorkingDir)
+
+	// Validate working directory still exists at runtime
+	if info, err := os.Stat(job.WorkingDir); err != nil {
+		return nil, fmt.Errorf("job %q: working directory %q does not exist — was it deleted after job creation?", job.Name, job.WorkingDir)
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("job %q: working directory %q is not a directory", job.Name, job.WorkingDir)
+	}
+
 	now := time.Now()
 	timestamp := now.Format("20060102-150405")
 
@@ -142,6 +152,9 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		result.CostUSD, result.InputTokens, result.OutputTokens,
 		result.CacheReadTokens, result.CacheCreationTokens,
 		result.Status, result.ErrorMsg)
+
+	logger.Debug("Job %q finished: status=%s exit=%d duration=%s cost=$%.4f",
+		job.Name, result.Status, result.ExitCode, result.Duration, result.CostUSD)
 
 	return result, nil
 }

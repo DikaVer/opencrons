@@ -26,17 +26,15 @@ type WizardResult struct {
 // RunAddWizard runs the interactive wizard to create a new job.
 func RunAddWizard() (*WizardResult, error) {
 	var (
-		name             string
-		workingDir       string
-		contextSources   []string
-		schedule         string
-		presetKey        string
-		prompt           string
-		model            string
-		effort           string
-		timeout          string
-		maxTurns         string
-		summaryEnabled   bool
+		name           string
+		workingDir     string
+		schedule       string
+		presetKey      string
+		prompt         string
+		model          string
+		effort         string
+		timeout        string
+		summaryEnabled bool
 	)
 
 	cwd, _ := os.Getwd()
@@ -77,32 +75,8 @@ func RunAddWizard() (*WizardResult, error) {
 			}),
 	)
 
-	// Step 2: Context & Memory
+	// Step 2: Schedule
 	step2 := huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("Claude Code Context").
-			Description("Which context sources should Claude load from your project directory?\n"+
-				"More context helps Claude follow conventions but may distract from the specific task.\n\n"+
-				"Project memory — CLAUDE.md and .claude/rules/ in the project (project conventions, architecture)\n"+
-				"User memory    — your global ~/.claude/CLAUDE.md (personal preferences across all projects)\n"+
-				"Local memory   — CLAUDE.local.md (your personal project overrides, not shared via git)\n"+
-				"Auto memory    — Claude's auto-generated notes about this project (may be stale)\n"+
-				"Skills         — slash commands and skill definitions (designed for interactive use)\n\n"+
-				"Tip: For focused, single-purpose jobs, less context is better. Project memory is usually\n"+
-				"the most useful — it contains architecture docs and conventions the agent should follow.\n"+
-				"Deselect all for fully isolated execution (context=none).").
-			Options(
-				huh.NewOption("Project memory — CLAUDE.md, project rules (recommended)", "project_memory").Selected(true),
-				huh.NewOption("User memory — global ~/.claude/CLAUDE.md preferences", "user_memory"),
-				huh.NewOption("Local memory — CLAUDE.local.md personal overrides", "local_memory"),
-				huh.NewOption("Auto memory — Claude's auto-generated project notes", "auto_memory"),
-				huh.NewOption("Skills — slash commands and skill definitions", "skills"),
-			).
-			Value(&contextSources),
-	)
-
-	// Step 3: Schedule
-	step3 := huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Schedule").
 			Description("When should this job run? Uses standard cron format (minute hour day-of-month month day-of-week).").
@@ -117,8 +91,8 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&presetKey),
 	)
 
-	// Step 4: Prompt
-	step4 := huh.NewGroup(
+	// Step 3: Prompt
+	step3 := huh.NewGroup(
 		huh.NewText().
 			Title("Prompt").
 			Description("What should Claude do? Be specific: describe the task, expected output, and any constraints.\nTip: For polished prompts, use /schedule add inside Claude Code instead.").
@@ -129,8 +103,8 @@ func RunAddWizard() (*WizardResult, error) {
 			Validate(ValidateNonEmpty),
 	)
 
-	// Step 5: Model
-	step5 := huh.NewGroup(
+	// Step 4: Model
+	step4 := huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Model").
 			Description("Which Claude model to use. Sonnet is the best balance of speed and capability for most tasks.").
@@ -142,8 +116,8 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&model),
 	)
 
-	// Step 6: Effort Level
-	step6 := huh.NewGroup(
+	// Step 5: Effort Level
+	step5 := huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Effort Level").
 			Description("Controls how much thinking effort Claude puts in. Higher = better results but more tokens.\n"+
@@ -157,20 +131,14 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&effort),
 	)
 
-	// Step 7: Timeout, Max Turns & Summary
-	step7 := huh.NewGroup(
+	// Step 6: Timeout & Summary
+	step6 := huh.NewGroup(
 		huh.NewInput().
 			Title("Timeout (seconds)").
 			Description("Maximum wall-clock time for the job. The process is killed if it exceeds this limit.\n"+
 				"Quick tasks: 60-120s. Standard tasks: 300s (5 min). Complex tasks: 600-900s. Default: 300.").
 			Placeholder("300").
 			Value(&timeout),
-		huh.NewInput().
-			Title("Max Turns").
-			Description("Limit the number of agentic turns (tool calls). 0 or empty = no limit.\n"+
-				"Use to cap runaway jobs. Typical tasks use 3-20 turns.").
-			Placeholder("0").
-			Value(&maxTurns),
 		huh.NewConfirm().
 			Title("Enable Report Summarization").
 			Description(fmt.Sprintf("When enabled, Claude generates a short Telegram-style summary after each run.\n"+
@@ -178,7 +146,7 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&summaryEnabled),
 	)
 
-	form := huh.NewForm(step1, step2, step3, step4, step5, step6, step7).
+	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -213,13 +181,6 @@ func RunAddWizard() (*WizardResult, error) {
 		workingDir = cwd
 	}
 
-	// Derive context disable flags from selected sources
-	disableProjectMemory := !contains(contextSources, "project_memory")
-	disableUserMemory := !contains(contextSources, "user_memory")
-	disableLocalMemory := !contains(contextSources, "local_memory")
-	disableAutoMemory := !contains(contextSources, "auto_memory")
-	disableSkills := !contains(contextSources, "skills")
-
 	// Normalize effort: "high" is the default, omit it from config
 	effortVal := effort
 	if effortVal == "high" {
@@ -228,24 +189,17 @@ func RunAddWizard() (*WizardResult, error) {
 
 	// Build job config
 	job := &config.JobConfig{
-		ID:                   uuid.New().String()[:8],
-		Name:                 name,
-		Schedule:             schedule,
-		WorkingDir:           workingDir,
-		PromptFile:           name + ".md",
-		Model:                model,
-		PermissionMode:       "bypassPermissions",
-		MaxTurns:             parseInt(maxTurns, 0),
-		Timeout:              parseInt(timeout, 300),
-		Effort:               effortVal,
-		SummaryEnabled:       summaryEnabled,
-		DisableProjectMemory: disableProjectMemory,
-		DisableUserMemory:    disableUserMemory,
-		DisableLocalMemory:   disableLocalMemory,
-		DisableAutoMemory:    disableAutoMemory,
-		DisableSkills:        disableSkills,
-		NoSessionPersistence: true,
-		Enabled:              true,
+		ID:               uuid.New().String()[:8],
+		Name:             name,
+		Schedule:         schedule,
+		WorkingDir:       workingDir,
+		PromptFile:       name + ".md",
+		Model:            model,
+		Timeout:          parseInt(timeout, 300),
+		Effort:           effortVal,
+		SummaryEnabled:   summaryEnabled,
+		NoSessionPersist: true,
+		Enabled:          true,
 	}
 
 	return &WizardResult{
@@ -268,29 +222,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	if job.Timeout > 0 {
 		timeout = fmt.Sprintf("%d", job.Timeout)
 	}
-	maxTurns := ""
-	if job.MaxTurns > 0 {
-		maxTurns = fmt.Sprintf("%d", job.MaxTurns)
-	}
 	summaryEnabled := job.SummaryEnabled
-
-	// Build initial context sources from existing disable flags
-	var contextSources []string
-	if !job.DisableProjectMemory {
-		contextSources = append(contextSources, "project_memory")
-	}
-	if !job.DisableUserMemory {
-		contextSources = append(contextSources, "user_memory")
-	}
-	if !job.DisableLocalMemory {
-		contextSources = append(contextSources, "local_memory")
-	}
-	if !job.DisableAutoMemory {
-		contextSources = append(contextSources, "auto_memory")
-	}
-	if !job.DisableSkills {
-		contextSources = append(contextSources, "skills")
-	}
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -368,11 +300,6 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Description("Quick: 60-120s. Standard: 300s. Complex: 600-900s. Default: 300.").
 			Placeholder("300").
 			Value(&timeout),
-		huh.NewInput().
-			Title("Max Turns").
-			Description("Limit agentic turns. 0 or empty = no limit.").
-			Placeholder("0").
-			Value(&maxTurns),
 		huh.NewConfirm().
 			Title("Enable Report Summarization").
 			Description(fmt.Sprintf("Generates a short Telegram-style summary after each run.\n"+
@@ -380,28 +307,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Value(&summaryEnabled),
 	)
 
-	step6 := huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("Claude Code Context").
-			Description("Which context sources should Claude load from your project?\n"+
-				"Less context = more focused on the task. More context = follows project conventions.\n\n"+
-				"Project memory — CLAUDE.md and .claude/rules/ (architecture, conventions)\n"+
-				"User memory    — ~/.claude/CLAUDE.md (your global preferences)\n"+
-				"Local memory   — CLAUDE.local.md (personal project overrides)\n"+
-				"Auto memory    — Claude's auto-generated notes (may be stale or noisy)\n"+
-				"Skills         — slash commands (designed for interactive use, rarely needed in jobs)\n\n"+
-				"Deselect all for fully isolated execution (context=none).").
-			Options(
-				huh.NewOption("Project memory — CLAUDE.md, project rules", "project_memory").Selected(contains(contextSources, "project_memory")),
-				huh.NewOption("User memory — global preferences", "user_memory").Selected(contains(contextSources, "user_memory")),
-				huh.NewOption("Local memory — personal overrides", "local_memory").Selected(contains(contextSources, "local_memory")),
-				huh.NewOption("Auto memory — auto-generated notes", "auto_memory").Selected(contains(contextSources, "auto_memory")),
-				huh.NewOption("Skills — slash commands", "skills").Selected(contains(contextSources, "skills")),
-			).
-			Value(&contextSources),
-	)
-
-	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
+	form := huh.NewForm(step1, step2, step3, step4, step5).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -430,13 +336,6 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		schedule = presetKey
 	}
 
-	// Derive context disable flags
-	disableProjectMemory := !contains(contextSources, "project_memory")
-	disableUserMemory := !contains(contextSources, "user_memory")
-	disableLocalMemory := !contains(contextSources, "local_memory")
-	disableAutoMemory := !contains(contextSources, "auto_memory")
-	disableSkills := !contains(contextSources, "skills")
-
 	// Normalize effort: "high" is the default, omit it from config
 	effortVal := effort
 	if effortVal == "high" {
@@ -447,28 +346,13 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	job.Schedule = schedule
 	job.Model = model
 	job.Effort = effortVal
-	job.MaxTurns = parseInt(maxTurns, 0)
 	job.Timeout = parseInt(timeout, 300)
 	job.SummaryEnabled = summaryEnabled
-	job.DisableProjectMemory = disableProjectMemory
-	job.DisableUserMemory = disableUserMemory
-	job.DisableLocalMemory = disableLocalMemory
-	job.DisableAutoMemory = disableAutoMemory
-	job.DisableSkills = disableSkills
 
 	return &WizardResult{
 		Job:           job,
 		PromptContent: strings.TrimSpace(prompt),
 	}, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 func parseInt(s string, defaultVal int) int {
