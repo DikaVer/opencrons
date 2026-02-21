@@ -1,3 +1,6 @@
+// File logs.go implements the logs command, which displays execution logs as JSON.
+// It supports an optional job name filter and a -n flag to limit the number of
+// entries returned.
 package cmd
 
 import (
@@ -5,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
 	"github.com/spf13/cobra"
 )
 

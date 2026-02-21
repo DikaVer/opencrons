@@ -5,7 +5,7 @@ user-invocable: true
 argument-hint: [add|list|edit|run|enable|disable|remove|logs|status]
 ---
 
-You help the user manage cli-scheduler jobs. This is the RECOMMENDED way to create jobs because you guide the user through writing high-quality, production-ready prompts.
+You help the user manage opencron jobs. This is the RECOMMENDED way to create jobs because you guide the user through writing high-quality, production-ready prompts.
 
 ## Commands
 
@@ -173,13 +173,13 @@ Present the config as a summary table and confirm with the user.
 ### Phase 4: Save Everything
 
 **First**, write the prompt to the prompts directory:
-- **Linux/macOS:** `~/.cli-scheduler/prompts/<job-name>.md`
-- **Windows:** `%APPDATA%\cli-scheduler\prompts\<job-name>.md`
+- **Linux/macOS:** `~/.opencron/prompts/<job-name>.md`
+- **Windows:** `%APPDATA%\opencron\prompts\<job-name>.md`
 
-**Then**, call `scheduler add --non-interactive` with all parameters:
+**Then**, call `opencron add --non-interactive` with all parameters:
 
 ```bash
-scheduler add --non-interactive \
+opencron add --non-interactive \
   --name "job-name" \
   --schedule "0 2 * * *" \
   --prompt-file "job-name.md" \
@@ -264,7 +264,7 @@ Respond with JSON:
 
 ---
 
-## Complete Flag Reference (`scheduler add --non-interactive`)
+## Complete Flag Reference (`opencron add --non-interactive`)
 
 ### Required flags
 
@@ -328,35 +328,35 @@ Respond with JSON:
 
 ## Other Commands
 
-### Edit: `scheduler edit <name>`
+### Edit: `opencron edit <name>`
 Opens the interactive edit wizard. Or edit files directly:
-- YAML: `~/.cli-scheduler/schedules/<name>.yml` (Linux/macOS) or `%APPDATA%\cli-scheduler\schedules\<name>.yml` (Windows)
-- Prompt: `~/.cli-scheduler/prompts/<name>.md` (Linux/macOS) or `%APPDATA%\cli-scheduler\prompts\<name>.md` (Windows)
+- YAML: `~/.opencron/schedules/<name>.yml` (Linux/macOS) or `%APPDATA%\opencron\schedules\<name>.yml` (Windows)
+- Prompt: `~/.opencron/prompts/<name>.md` (Linux/macOS) or `%APPDATA%\opencron\prompts\<name>.md` (Windows)
 
 The daemon hot-reloads YAML changes automatically (500ms debounce).
 
 ### Enable/Disable
 ```bash
-scheduler disable <name>   # Pauses job (keeps config, daemon skips it)
-scheduler enable <name>    # Resumes running on schedule
+opencron disable <name>   # Pauses job (keeps config, daemon skips it)
+opencron enable <name>    # Resumes running on schedule
 ```
 
-### List: `scheduler list`
+### List: `opencron list`
 Shows all jobs with name, schedule, model, effort, and enabled/disabled status.
 
-### Run: `scheduler run <name>`
+### Run: `opencron run <name>`
 Execute immediately (bypass schedule). Shows status, duration, exit code, cost, and token breakdown.
 
-### Remove: `scheduler remove <name>`
+### Remove: `opencron remove <name>`
 Deletes the job config YAML and its prompt file. Use `-f` to skip confirmation.
 
-### Logs: `scheduler logs [name]`
+### Logs: `opencron logs [name]`
 View execution history. Shows job name, start time, status, trigger type, cost, and token I/O.
 
-### Status: `scheduler status`
+### Status: `opencron status`
 Shows daemon running/stopped status and next scheduled run time for each enabled job.
 
-### Validate: `scheduler validate`
+### Validate: `opencron validate`
 Validates all job configs. Reports errors (invalid cron, missing working dir) and warnings (missing prompt file).
 
 ---
@@ -364,10 +364,10 @@ Validates all job configs. Reports errors (invalid cron, missing working dir) an
 ## Daemon
 
 ```bash
-scheduler start              # Run in foreground (Ctrl+C to stop)
-scheduler start --install    # Install as OS service (requires admin/root)
-scheduler stop               # Stop running daemon
-scheduler status             # Check daemon + next runs
+opencron start              # Run in foreground (Ctrl+C to stop)
+opencron start --install    # Install as OS service (requires admin/root)
+opencron stop               # Stop running daemon
+opencron status             # Check daemon + next runs
 ```
 
 ---
@@ -380,9 +380,9 @@ scheduler status             # Check daemon + next runs
 | `prompts/` | One .md file per job (prompt content) |
 | `logs/` | stdout (.json) and stderr (.log) per execution |
 | `summary/` | Execution summaries (when enabled) |
-| `data/scheduler.db` | SQLite execution log + token usage |
+| `data/opencron.db` | SQLite execution log + token usage |
 | `settings.json` | Debug settings |
-| `scheduler.pid` | Daemon PID lock file |
+| `opencron.pid` | Daemon PID lock file |
 
-**Linux/macOS:** `~/.cli-scheduler/` (or `$XDG_CONFIG_HOME/cli-scheduler/`)
-**Windows:** `%APPDATA%\cli-scheduler\`
+**Linux/macOS:** `~/.opencron/` (or `$XDG_CONFIG_HOME/opencron/`)
+**Windows:** `%APPDATA%\opencron\`

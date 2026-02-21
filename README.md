@@ -1,6 +1,6 @@
-# cli-scheduler
+# OpenCron
 
-A CLI scheduler for Claude Code automation. Run `claude -p` jobs on cron schedules and chat with Claude from Telegram — all managed through an interactive TUI or command-line interface.
+An open-source cron scheduler for Claude Code automation. Run `claude -p` jobs on cron schedules and chat with Claude from Telegram — all managed through an interactive TUI or command-line interface.
 
 **Core idea:** Separate "what to think about" (prompt file) from "what you're allowed to do" (YAML config). The prompt is the only dynamic part — everything else is a declarative config.
 
@@ -25,22 +25,22 @@ A CLI scheduler for Claude Code automation. Run `claude -p` jobs on cron schedul
 ### Build
 
 ```bash
-go build -o build/scheduler ./cmd/scheduler/
+go build -o build/opencron ./cmd/opencron/
 ```
 
-On Windows, this produces `build/scheduler.exe`.
+On Windows, this produces `build/opencron.exe`.
 
 ### First Run
 
 ```bash
-./build/scheduler
+./build/opencron
 ```
 
-The first time you run the scheduler, the setup wizard walks you through:
+The first time you run OpenCron, the setup wizard walks you through:
 
 1. **Provider detection** — verifies Claude Code CLI is installed and authenticated
 2. **Telegram integration** (optional) — connect a Telegram bot for remote access
-3. **Chat defaults** — choose default model and effort level for chat sessions
+3. **Chat Model** — choose default model and effort level for chat sessions
 4. **Daemon mode** — background process or system service
 
 After setup, you'll land in the interactive TUI.
@@ -49,10 +49,10 @@ After setup, you'll land in the interactive TUI.
 
 ```bash
 # Interactive wizard (recommended)
-./build/scheduler add
+./build/opencron add
 
 # Or non-interactive for scripting
-./build/scheduler add --non-interactive \
+./build/opencron add --non-interactive \
   --name "nightly-review" \
   --schedule "0 2 * * *" \
   --prompt-content "Review all changed files for security vulnerabilities" \
@@ -66,22 +66,22 @@ After setup, you'll land in the interactive TUI.
 
 ```bash
 # Foreground (Ctrl+C to stop)
-./build/scheduler start
+./build/opencron start
 
 # Or install as a system service
-./build/scheduler start --install
+./build/opencron start --install
 ```
 
 The daemon runs your scheduled jobs and the Telegram bot (if configured) in a single process.
 
-> **Windows PowerShell:** Use `.\build\scheduler.exe` instead of `./build/scheduler`.
+> **Windows PowerShell:** Use `.\build\opencron.exe` instead of `./build/opencron`.
 
 ## Interactive TUI
 
-Running `scheduler` with no arguments opens the main menu:
+Running `opencron` with no arguments opens the main menu:
 
 ```
-  CLI Scheduler — Claude Code Automation
+  OpenCron — Claude Code Automation
   Schedule and manage automated Claude Code tasks
 
   Daemon: running    Jobs: 3 total, 2 enabled    Chat: telegram    Next: nightly-review in 8h30m
@@ -128,7 +128,7 @@ Manage all configuration from the Settings menu:
   What would you like to change?
   > Provider               View/change AI provider
     Messenger              View/change Telegram settings
-    Chat defaults          Change model and effort
+    Chat Model             Change Model and effort
     Daemon mode            Background vs. system service
     Debug logging          Toggle on/off
     Re-run setup           Start setup wizard again
@@ -157,7 +157,7 @@ Connect a Telegram bot to chat with Claude and manage your scheduled jobs from a
 ### Setup
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram
-2. Run `scheduler setup` (or let the first-run wizard guide you)
+2. Run `opencron setup` (or let the first-run wizard guide you)
 3. Paste your bot token
 4. Choose a pairing method:
    - **Pairing token** — the bot generates a code to verify your identity
@@ -182,7 +182,7 @@ Any other text message is sent to Claude as a chat message.
 - Claude maintains conversation history internally — no prompt reconstruction needed
 - Use `/new` to clear context and start fresh
 - Sessions track model, effort level, and working directory independently
-- All messages are logged to SQLite for visibility (terminal echo, `scheduler logs`)
+- All messages are logged to SQLite for visibility (terminal echo, `opencron logs`)
 
 ### Job Management
 
@@ -200,7 +200,7 @@ Tap a job to see its details and action buttons: Enable/Disable, Run Now, or Bac
 
 ### How It Works
 
-The Telegram bot runs **inside the daemon** alongside the cron scheduler. When you run `scheduler start`, both start together in a single process:
+The Telegram bot runs **inside the daemon** alongside the cron scheduler. When you run `opencron start`, both start together in a single process:
 
 - No IPC needed — bot has direct access to the same DB, config, and executor
 - Job completion notifications are sent to all authorized users
@@ -211,30 +211,30 @@ The Telegram bot runs **inside the daemon** alongside the cron scheduler. When y
 
 | Command | Description |
 |---------|-------------|
-| `scheduler` | Open interactive TUI menu |
-| `scheduler setup` | Run (or re-run) the setup wizard |
-| `scheduler settings` | Manage provider, messenger, chat, debug settings |
-| `scheduler add` | Create a new job (wizard or `--non-interactive`) |
-| `scheduler list` | List all jobs in a styled table |
-| `scheduler edit [name]` | Edit a job's config and prompt |
-| `scheduler disable [name]` | Disable a job (keeps config) |
-| `scheduler enable [name]` | Enable a disabled job |
-| `scheduler remove [name]` | Remove a job (`-f` to skip confirmation) |
-| `scheduler run <name>` | Execute a job immediately (shows cost + tokens) |
-| `scheduler logs [name]` | View execution history |
-| `scheduler start` | Start the daemon (foreground, includes Telegram bot) |
-| `scheduler start --install` | Install as a system service |
-| `scheduler stop` | Stop the daemon |
-| `scheduler status` | Show daemon status + next scheduled runs |
-| `scheduler validate` | Validate all job configs |
-| `scheduler debug [on\|off]` | Toggle debug logging |
+| `opencron` | Open interactive TUI menu |
+| `opencron setup` | Run (or re-run) the setup wizard |
+| `opencron settings` | Manage provider, messenger, chat, debug settings |
+| `opencron add` | Create a new job (wizard or `--non-interactive`) |
+| `opencron list` | List all jobs in a styled table |
+| `opencron edit [name]` | Edit a job's config and prompt |
+| `opencron disable [name]` | Disable a job (keeps config) |
+| `opencron enable [name]` | Enable a disabled job |
+| `opencron remove [name]` | Remove a job (`-f` to skip confirmation) |
+| `opencron run <name>` | Execute a job immediately (shows cost + tokens) |
+| `opencron logs [name]` | View execution history |
+| `opencron start` | Start the daemon (foreground, includes Telegram bot) |
+| `opencron start --install` | Install as a system service |
+| `opencron stop` | Stop the daemon |
+| `opencron status` | Show daemon status + next scheduled runs |
+| `opencron validate` | Validate all job configs |
+| `opencron debug [on\|off]` | Toggle debug logging |
 
 ## Non-Interactive Mode
 
 For scripting and the Claude Code skill (`/schedule add`), use `--non-interactive`:
 
 ```bash
-./build/scheduler add --non-interactive \
+./build/opencron add --non-interactive \
   --name "nightly-review" \
   --schedule "0 2 * * *" \
   --prompt-content "Review all changed files for security vulnerabilities" \
@@ -309,7 +309,7 @@ The daemon runs your scheduled jobs and the Telegram bot automatically. It watch
 ### Foreground
 
 ```bash
-./build/scheduler start
+./build/opencron start
 ```
 
 Runs in your terminal. Press Ctrl+C to stop. See job execution and Telegram chat logs in real time.
@@ -317,7 +317,7 @@ Runs in your terminal. Press Ctrl+C to stop. See job execution and Telegram chat
 ### System Service
 
 ```bash
-./build/scheduler start --install
+./build/opencron start --install
 ```
 
 Registers as a system service that starts on boot:
@@ -368,22 +368,22 @@ Then use `/schedule add` in Claude Code — Claude helps write high-quality prom
 ## Config Directory
 
 ```
-~/.cli-scheduler/          (Linux/macOS, or $XDG_CONFIG_HOME/cli-scheduler)
-%APPDATA%\cli-scheduler\   (Windows)
+~/.opencron/          (Linux/macOS, or $XDG_CONFIG_HOME/opencron)
+%APPDATA%\opencron\   (Windows)
   ├── schedules/            # YAML job configs
   ├── prompts/              # Prompt files (.md)
   ├── logs/                 # stdout (.json) / stderr (.log) per execution
   ├── summary/              # Execution summaries
   ├── workspace/            # CLAUDE.md + .claude/ (copied during setup)
-  ├── data/scheduler.db     # SQLite: execution logs, chat sessions, messages
+  ├── data/opencron.db      # SQLite: execution logs, chat sessions, messages
   ├── settings.json         # All settings (provider, messenger, chat, daemon, debug)
-  └── scheduler.pid         # Daemon PID file
+  └── opencron.pid          # Daemon PID file
 ```
 
 ## Architecture
 
 ```
-cmd/scheduler/main.go
+cmd/opencron/main.go
   └ internal/cmd/              Cobra commands + TUI menu loop
        ├ internal/config/       JobConfig struct, YAML load/save, prompt file I/O
        ├ internal/tui/          Menus, wizards, settings, validators (charmbracelet/huh)
@@ -400,23 +400,23 @@ cmd/scheduler/main.go
 
 ### Three Modes of Operation
 
-1. **Interactive TUI** — `scheduler` with no args opens the main menu
-2. **CLI subcommands** — `scheduler add`, `scheduler list`, etc. for scripting
+1. **Interactive TUI** — `opencron` with no args opens the main menu
+2. **CLI subcommands** — `opencron add`, `opencron list`, etc. for scripting
 3. **Telegram bot** — runs inside the daemon alongside cron for remote access
 
 ### Platform Support
 
 | Platform | PID Detection | Config Path |
 |----------|--------------|-------------|
-| Windows | `OpenProcess` | `%APPDATA%\cli-scheduler\` |
-| Linux | `syscall.Signal(0)` | `~/.cli-scheduler/` or `$XDG_CONFIG_HOME/cli-scheduler/` |
-| macOS | `syscall.Signal(0)` | `~/.cli-scheduler/` |
+| Windows | `OpenProcess` | `%APPDATA%\opencron\` |
+| Linux | `syscall.Signal(0)` | `~/.opencron/` or `$XDG_CONFIG_HOME/opencron/` |
+| macOS | `syscall.Signal(0)` | `~/.opencron/` |
 
 ## Development
 
 ```bash
 # Build
-go build -o build/scheduler ./cmd/scheduler/
+go build -o build/opencron ./cmd/opencron/
 make build              # with version ldflags
 
 # Cross-compile

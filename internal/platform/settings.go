@@ -1,3 +1,11 @@
+// Package platform provides JSON-based settings persistence via settings.json.
+//
+// The Settings struct holds all application configuration: Debug and SetupComplete
+// flags, Provider (AI provider ID), Messenger (Telegram bot token and allowed users),
+// Chat (default model and effort level), and DaemonMode. LoadSettings and SaveSettings
+// handle file I/O with sensible defaults for missing files. Convenience functions
+// IsDebugEnabled, SetDebug, IsSetupComplete, GetMessengerConfig, and GetChatConfig
+// provide targeted access with default value fallbacks.
 package platform
 
 import (
@@ -25,7 +33,6 @@ type ProviderSettings struct {
 type MessengerSettings struct {
 	Type         string          `json:"type"`                    // "telegram" | ""
 	BotToken     string          `json:"bot_token"`
-	Pairing      string          `json:"pairing_mode"`            // "gatherToken" | "allowList"
 	AllowedUsers map[string]bool `json:"allowed_users,omitempty"`
 }
 

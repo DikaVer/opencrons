@@ -1,3 +1,6 @@
+// File setup.go implements the setup command and the runSetupWizard helper.
+// It runs the TUI setup wizard, copies .workspace/ files (AGENTS.md to CLAUDE.md,
+// .agents/ to .claude/) into the config directory, and saves the resulting settings.
 package cmd
 
 import (
@@ -6,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/tui"
 	"github.com/spf13/cobra"
 )
 

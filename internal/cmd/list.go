@@ -1,3 +1,5 @@
+// File list.go implements the list command, which displays all configured jobs
+// in a styled table showing name, schedule, model, effort, and enabled status.
 package cmd
 
 import (
@@ -5,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -28,30 +30,25 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(jobs) == 0 {
-		fmt.Println("No jobs configured. Use 'scheduler add' to create one.")
+		fmt.Println("No jobs configured. Use 'opencron add' to create one.")
 		return nil
 	}
 
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#cba6f7"))
-	enabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
-	disabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-
 	// Header
 	fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s\n",
-		headerStyle.Width(20).Render("NAME"),
-		headerStyle.Width(18).Render("SCHEDULE"),
-		headerStyle.Width(10).Render("MODEL"),
-		headerStyle.Width(10).Render("EFFORT"),
-		headerStyle.Width(8).Render("STATUS"),
+		ui.Title.Width(20).Render("NAME"),
+		ui.Title.Width(18).Render("SCHEDULE"),
+		ui.Title.Width(10).Render("MODEL"),
+		ui.Title.Width(10).Render("EFFORT"),
+		ui.Title.Width(8).Render("STATUS"),
 	)
 
-	fmt.Println(dimStyle.Render("  "+strings.Repeat("-", 70)))
+	fmt.Println(ui.Dim.Render("  " + strings.Repeat("-", 70)))
 
 	for _, job := range jobs {
-		status := enabledStyle.Render("enabled")
+		status := ui.Success.Render("enabled")
 		if !job.Enabled {
-			status = disabledStyle.Render("disabled")
+			status = ui.Fail.Render("disabled")
 		}
 
 		effort := job.Effort
@@ -60,22 +57,14 @@ func runList(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Fprintf(os.Stdout, "  %-20s  %-18s  %-10s  %-10s  %s\n",
-			truncate(job.Name, 20),
-			truncate(job.Schedule, 18),
-			truncate(job.Model, 10),
+			ui.Truncate(job.Name, 20),
+			ui.Truncate(job.Schedule, 18),
+			ui.Truncate(job.Model, 10),
 			effort,
 			status,
 		)
 	}
 
-	fmt.Printf("\n  %s %d job(s) configured\n", dimStyle.Render("Total:"), len(jobs))
+	fmt.Printf("\n  %s %d job(s) configured\n", ui.Dim.Render("Total:"), len(jobs))
 	return nil
-}
-
-func truncate(s string, maxLen int) string {
-	runes := []rune(s)
-	if len(runes) <= maxLen {
-		return s
-	}
-	return string(runes[:maxLen-1]) + "…"
 }

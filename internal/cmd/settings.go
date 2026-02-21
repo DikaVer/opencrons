@@ -1,11 +1,14 @@
+// File settings.go implements the settings command and the handleSettingsMenu loop.
+// It dispatches to handlers for provider, messenger, chat model, daemon mode,
+// debug, and re-run setup options, saving changed settings to the platform config.
 package cmd
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -56,19 +59,22 @@ func handleSettingsMenu() error {
 			}
 			tui.PrintPressEnter()
 
-		case tui.SettingsChatDefaults:
-			chatSettings, err := tui.RunChatDefaultsSettings()
+		case tui.SettingsChatModel:
+			chatSettings, err := tui.RunChatModelSettings()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
 				tui.PrintPressEnter()
 				continue
+			}
+			if chatSettings == nil {
+				continue // back
 			}
 			s := platform.LoadSettings()
 			s.Chat = chatSettings
 			if err := platform.SaveSettings(s); err != nil {
 				fmt.Fprintf(os.Stderr, "  Error saving: %v\n", err)
 			} else {
-				fmt.Println("  Chat defaults saved.")
+				fmt.Println("Chat Model saved.")
 			}
 			tui.PrintPressEnter()
 
@@ -78,6 +84,9 @@ func handleSettingsMenu() error {
 				fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
 				tui.PrintPressEnter()
 				continue
+			}
+			if mode == "" {
+				continue // back
 			}
 			s := platform.LoadSettings()
 			s.DaemonMode = mode

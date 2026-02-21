@@ -1,3 +1,5 @@
+// File status.go implements the status command, which shows whether the daemon
+// is running and lists the next scheduled run times for all enabled jobs.
 package cmd
 
 import (
@@ -5,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/robfig/cron/v3"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -23,17 +24,12 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	accentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#cba6f7"))
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
-	failStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-
 	// Daemon status
 	pid, running := platform.CheckDaemonRunning()
 	if running {
-		fmt.Printf("  Daemon: %s (PID %d)\n", successStyle.Render("running"), pid)
+		fmt.Printf("  Daemon: %s (PID %d)\n", ui.Success.Render("running"), pid)
 	} else {
-		fmt.Printf("  Daemon: %s\n", failStyle.Render("stopped"))
+		fmt.Printf("  Daemon: %s\n", ui.Fail.Render("stopped"))
 	}
 
 	// Show jobs and next run times
@@ -48,21 +44,20 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("  %s\n", accentStyle.Render("Scheduled Jobs:"))
-	fmt.Println(dimStyle.Render("  " + strings.Repeat("-", 60)))
+	fmt.Printf("  %s\n", ui.Title.Render("Scheduled Jobs:"))
+	fmt.Println(ui.Dim.Render("  " + strings.Repeat("-", 60)))
 
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	now := time.Now()
 
 	for _, job := range jobs {
 		if !job.Enabled {
-			fmt.Printf("  %-20s  %s\n", job.Name, dimStyle.Render("disabled"))
+			fmt.Printf("  %-20s  %s\n", job.Name, ui.Dim.Render("disabled"))
 			continue
 		}
 
-		sched, err := parser.Parse(job.Schedule)
+		sched, err := ui.CronParser.Parse(job.Schedule)
 		if err != nil {
-			fmt.Printf("  %-20s  %s\n", job.Name, failStyle.Render("invalid schedule"))
+			fmt.Printf("  %-20s  %s\n", job.Name, ui.Fail.Render("invalid schedule"))
 			continue
 		}
 
@@ -72,7 +67,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  %-20s  next: %s (%s)\n",
 			job.Name,
 			nextRun.Format("2006-01-02 15:04"),
-			dimStyle.Render(fmt.Sprintf("in %s", until)),
+			ui.Dim.Render(fmt.Sprintf("in %s", until)),
 		)
 	}
 

@@ -1,10 +1,13 @@
+// File debug.go implements the debug logging toggle command. With no arguments
+// it displays the current debug state; with "on" or "off" it enables or disables
+// debug logging by updating the platform settings.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -21,18 +24,14 @@ func init() {
 }
 
 func runDebug(cmd *cobra.Command, args []string) error {
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1"))
-	failStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-
 	if len(args) == 0 {
 		// Show current state
 		if platform.IsDebugEnabled() {
-			fmt.Printf("  Debug logging: %s\n", successStyle.Render("on"))
+			fmt.Printf("  Debug logging: %s\n", ui.Success.Render("on"))
 		} else {
-			fmt.Printf("  Debug logging: %s\n", failStyle.Render("off"))
+			fmt.Printf("  Debug logging: %s\n", ui.Fail.Render("off"))
 		}
-		fmt.Println(dimStyle.Render("  Use 'scheduler debug on' or 'scheduler debug off' to toggle."))
+		fmt.Println(ui.Dim.Render("  Use 'opencron debug on' or 'opencron debug off' to toggle."))
 		return nil
 	}
 
@@ -41,13 +40,13 @@ func runDebug(cmd *cobra.Command, args []string) error {
 		if err := platform.SetDebug(true); err != nil {
 			return fmt.Errorf("saving settings: %w", err)
 		}
-		fmt.Printf("  Debug logging: %s\n", successStyle.Render("on"))
-		fmt.Printf("  Logs: %s\n", dimStyle.Render(platform.LogsDir()+"/scheduler-debug.log"))
+		fmt.Printf("  Debug logging: %s\n", ui.Success.Render("on"))
+		fmt.Printf("  Logs: %s\n", ui.Dim.Render(platform.LogsDir()+"/opencron-debug.log"))
 	case "off":
 		if err := platform.SetDebug(false); err != nil {
 			return fmt.Errorf("saving settings: %w", err)
 		}
-		fmt.Printf("  Debug logging: %s\n", failStyle.Render("off"))
+		fmt.Printf("  Debug logging: %s\n", ui.Fail.Render("off"))
 	default:
 		return fmt.Errorf("invalid argument %q: use 'on' or 'off'", args[0])
 	}

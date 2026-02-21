@@ -1,3 +1,6 @@
+// File run.go implements the run command, which executes a job immediately by name.
+// It opens the database, runs the executor, and displays results including status,
+// duration, cost, token usage, output path, and any errors.
 package cmd
 
 import (
@@ -6,10 +9,10 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/executor"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/executor"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
 	"github.com/spf13/cobra"
 )
 

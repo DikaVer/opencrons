@@ -1,3 +1,10 @@
+// Package telegram implements the Telegram messenger integration using
+// go-telegram/bot. The Bot struct manages the database, settings, chat
+// components, and per-user processing locks (sync.Map). It provides
+// Start/Stop lifecycle, Send/SendPlain message delivery, IsAuthorized
+// user checks, command and callback handler registration, auth middleware
+// for both message and callback handlers, and tryLock/unlock for per-user
+// concurrency control.
 package telegram
 
 import (
@@ -10,13 +17,13 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/chat"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/chat"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
 )
 
-// Bot wraps the Telegram bot with scheduler integration.
+// Bot wraps the Telegram bot with OpenCron integration.
 type Bot struct {
 	bot      *bot.Bot
 	db       *storage.DB
@@ -30,6 +37,9 @@ type Bot struct {
 
 	// Per-user processing lock (prevents concurrent message processing)
 	processing sync.Map // map[int64]bool
+
+	// Per-user cancel functions for in-flight queries (allows /stop)
+	cancels sync.Map // map[int64]context.CancelFunc
 }
 
 // New creates a new Telegram bot instance.
@@ -107,30 +117,8 @@ func (b *Bot) IsAuthorized(userID int64) bool {
 		return false
 	}
 
-	// Check by numeric ID
 	idStr := strconv.FormatInt(userID, 10)
-	if b.settings.AllowedUsers[idStr] {
-		return true
-	}
-
-	// Check for pending pairing (allow all until first user pairs)
-	if b.settings.AllowedUsers["__pending_pairing__"] {
-		return true
-	}
-
-	return false
-}
-
-// CompletePairing adds a user ID to the allowed list and removes pending flag.
-func (b *Bot) CompletePairing(userID int64) error {
-	idStr := strconv.FormatInt(userID, 10)
-	b.settings.AllowedUsers[idStr] = true
-	delete(b.settings.AllowedUsers, "__pending_pairing__")
-
-	// Persist to settings
-	s := platform.LoadSettings()
-	s.Messenger = b.settings
-	return platform.SaveSettings(s)
+	return b.settings.AllowedUsers[idStr]
 }
 
 // registerHandlers sets up all command and callback handlers.
@@ -139,6 +127,7 @@ func (b *Bot) registerHandlers() {
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/jobs", bot.MatchTypePrefix, b.authMiddleware(b.handleJobs))
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/model", bot.MatchTypePrefix, b.authMiddleware(b.handleModel))
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/effort", bot.MatchTypePrefix, b.authMiddleware(b.handleEffort))
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/stop", bot.MatchTypePrefix, b.authMiddleware(b.handleStopQuery))
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypePrefix, b.authMiddleware(b.handleStatus))
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, b.authMiddleware(b.handleHelp))
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, b.authMiddleware(b.handleHelp))
@@ -160,16 +149,6 @@ func (b *Bot) handleDefault(ctx context.Context, tgBot *bot.Bot, update *models.
 
 	// Authorization check
 	if !b.IsAuthorized(userID) {
-		// If pending pairing, complete it
-		if b.settings.AllowedUsers["__pending_pairing__"] {
-			if err := b.CompletePairing(userID); err != nil {
-				b.stdlog.Printf("[telegram] Pairing error: %v", err)
-			}
-			b.SendPlain(ctx, chatID, fmt.Sprintf("Paired successfully! Your user ID: %d\nSend any message to chat with Claude.", userID))
-			b.stdlog.Printf("[telegram] User %d paired successfully", userID)
-			return
-		}
-
 		b.SendPlain(ctx, chatID, "You are not authorized to use this bot.")
 		return
 	}

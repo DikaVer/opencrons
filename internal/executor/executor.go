@@ -1,3 +1,10 @@
+// executor.go orchestrates the full lifecycle of a scheduled job execution.
+// Run validates the working directory, creates a database log entry, sets up
+// stdout/stderr capture files, applies a context timeout, builds and runs the
+// claude command, determines the result status (success, failed, or timeout),
+// parses JSON usage data from stdout, and updates the database log with the
+// outcome. It also defines the claudeOutput struct for JSON parsing, the
+// Result struct returned to callers, and the parseUsage helper.
 package executor
 
 import (
@@ -9,10 +16,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
 )
 
 // claudeOutput represents the JSON output from `claude -p --output-format json`.
@@ -31,6 +38,7 @@ type Result struct {
 	ExitCode            int
 	StdoutPath          string
 	StderrPath          string
+	SummaryPath         string // path to summary file (if summary_enabled)
 	Status              string
 	ErrorMsg            string
 	Duration            time.Duration
@@ -96,7 +104,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	}
 
 	// Build command with context (supports cancellation and timeout)
-	cmd, err := BuildCommand(ctx, job)
+	built, err := BuildCommand(ctx, job)
 	if err != nil {
 		result := &Result{
 			ExitCode: -1,
@@ -107,6 +115,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 		return result, nil
 	}
 
+	cmd := built.Cmd
 	cmd.Stdout = stdoutFile
 	cmd.Stderr = stderrFile
 
@@ -141,6 +150,11 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	} else {
 		result.ExitCode = 0
 		result.Status = "success"
+	}
+
+	// Set summary path if summary was enabled
+	if built.SummaryPath != "" {
+		result.SummaryPath = built.SummaryPath
 	}
 
 	// Parse usage from JSON stdout

@@ -1,10 +1,12 @@
+// File enable.go implements the enable command, which activates a disabled job
+// by setting Enabled to true and saving the updated config.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 

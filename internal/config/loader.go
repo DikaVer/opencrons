@@ -1,3 +1,8 @@
+// Package config provides YAML file I/O for job configurations. It handles
+// loading, saving, and deleting job schedule files and their associated prompt
+// files. Functions include LoadJob, LoadAllJobs, SaveJob, SavePromptFile,
+// DeleteJob, JobNameExists, and FindJobByName. File paths are normalized to
+// handle Windows drive letter casing differences.
 package config
 
 import (

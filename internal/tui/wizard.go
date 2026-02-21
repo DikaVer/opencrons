@@ -1,3 +1,10 @@
+// wizard.go implements the job creation and editing wizards.
+//
+// WizardResult holds the resulting job configuration and prompt content.
+// RunAddWizard presents a 6-step form covering name, working directory, schedule
+// (presets or custom cron), prompt text, model, effort, timeout, and summary toggle.
+// RunEditWizard allows modifying an existing job's configuration. Both wizards use
+// the Catppuccin Mocha theme. The parseInt helper converts string inputs to integers.
 package tui
 
 import (
@@ -6,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/google/uuid"
 )
 
@@ -39,12 +46,7 @@ func RunAddWizard() (*WizardResult, error) {
 
 	cwd, _ := os.Getwd()
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#cba6f7")).
-		MarginBottom(1)
-
-	fmt.Println(titleStyle.Render("  Add New Scheduled Job"))
+	fmt.Println(ui.Title.MarginBottom(1).Render("  Add New Scheduled Job"))
 
 	// Step 1: Job identity
 	step1 := huh.NewGroup(
@@ -54,7 +56,7 @@ func RunAddWizard() (*WizardResult, error) {
 			Placeholder("nightly-review").
 			Value(&name).
 			Validate(func(s string) error {
-				if err := ValidateJobName(s); err != nil {
+				if err := ui.ValidateJobName(s); err != nil {
 					return err
 				}
 				if config.JobNameExists(platform.SchedulesDir(), s) {
@@ -71,7 +73,7 @@ func RunAddWizard() (*WizardResult, error) {
 				if s == "" {
 					return nil // will default to cwd
 				}
-				return ValidateDirectory(s)
+				return ui.ValidateDirectory(s)
 			}),
 	)
 
@@ -100,7 +102,7 @@ func RunAddWizard() (*WizardResult, error) {
 			CharLimit(5000).
 			Lines(6).
 			Value(&prompt).
-			Validate(ValidateNonEmpty),
+			Validate(ui.ValidateNonEmpty),
 	)
 
 	// Step 4: Model
@@ -150,6 +152,9 @@ func RunAddWizard() (*WizardResult, error) {
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
+		if IsAborted(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -164,11 +169,14 @@ func RunAddWizard() (*WizardResult, error) {
 						"Examples: */30 * * * * (every 30 min), 0 9,17 * * 1-5 (9am & 5pm weekdays)").
 					Placeholder("*/30 * * * *").
 					Value(&customCron).
-					Validate(ValidateCron),
+					Validate(ui.ValidateCron),
 			),
 		).WithTheme(theme)
 
 		if err := customForm.Run(); err != nil {
+			if IsAborted(err) {
+				return nil, nil
+			}
 			return nil, err
 		}
 		schedule = customCron
@@ -224,12 +232,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	}
 	summaryEnabled := job.SummaryEnabled
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#cba6f7")).
-		MarginBottom(1)
-
-	fmt.Println(titleStyle.Render(fmt.Sprintf("  Edit Job: %s", job.Name)))
+	fmt.Println(ui.Title.MarginBottom(1).Render(fmt.Sprintf("  Edit Job: %s", job.Name)))
 
 	// Check if current schedule matches a preset
 	isPreset := false
@@ -266,7 +269,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			CharLimit(5000).
 			Lines(6).
 			Value(&prompt).
-			Validate(ValidateNonEmpty),
+			Validate(ui.ValidateNonEmpty),
 	)
 
 	step3 := huh.NewGroup(
@@ -311,6 +314,9 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
+		if IsAborted(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -324,11 +330,14 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 					Description("5-field cron: minute hour day-of-month month day-of-week").
 					Placeholder(job.Schedule).
 					Value(&customCron).
-					Validate(ValidateCron),
+					Validate(ui.ValidateCron),
 			),
 		).WithTheme(theme)
 
 		if err := customForm.Run(); err != nil {
+			if IsAborted(err) {
+				return nil, nil
+			}
 			return nil, err
 		}
 		schedule = customCron

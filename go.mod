@@ -1,4 +1,4 @@
-module github.com/dika-maulidal/cli-scheduler
+module github.com/dika-maulidal/opencron
 
 go 1.25.0
 

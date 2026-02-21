@@ -1,11 +1,14 @@
+// File remove.go implements the remove command, which deletes a job after
+// confirmation. It supports --force to skip the confirmation prompt and
+// --keep-prompt to preserve the associated prompt file.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/tui"
 	"github.com/spf13/cobra"
 )
 

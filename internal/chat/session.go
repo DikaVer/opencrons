@@ -1,3 +1,10 @@
+// File session.go manages chat session lifecycle for Telegram users.
+//
+// SessionManager maps each Telegram user to a unique Claude Code session
+// UUID persisted in SQLite via [storage.DB]. It provides GetOrCreateSession
+// to lazily initialize sessions, CreateSession to start a fresh session
+// with the current chat configuration (model, effort), and ClearSession
+// to deactivate a user's active session (triggered by the /new command).
 package chat
 
 import (
@@ -7,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
 )
 
 // SessionManager manages chat sessions for users.

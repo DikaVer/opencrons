@@ -1,3 +1,10 @@
+// chat.go handles free-text Telegram messages as Claude conversations.
+//
+// SetChatComponents injects the session manager and runner after bot creation.
+// handleChatMessage acquires a per-user lock, gets or creates a session,
+// sends typing indicators, runs "claude -p --session-id", logs the exchange
+// to the database, sends the response to Telegram, and echoes a summary to
+// the terminal. sendTypingLoop refreshes the typing indicator every 5 seconds.
 package telegram
 
 import (
@@ -8,8 +15,8 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/chat"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/chat"
+	"github.com/dika-maulidal/opencron/internal/logger"
 )
 
 // SetChatComponents injects the session manager and runner into the bot.
@@ -45,12 +52,20 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 		return
 	}
 
+	// Create a cancellable context so /stop can kill this query
+	runCtx, runCancel := context.WithCancel(ctx)
+	b.cancels.Store(userID, runCancel)
+	defer func() {
+		b.cancels.Delete(userID)
+		runCancel()
+	}()
+
 	// Start typing indicator loop
-	typingCtx, typingCancel := context.WithCancel(ctx)
+	typingCtx, typingCancel := context.WithCancel(runCtx)
 	go b.sendTypingLoop(typingCtx, tgBot, chatID)
 
-	// Run Claude
-	result, err := b.chatRunner.Run(ctx, session, text)
+	// Run Claude (no timeout — runs until completion or /stop)
+	result, err := b.chatRunner.Run(runCtx, session, text)
 	typingCancel() // Stop typing indicator
 
 	if err != nil {

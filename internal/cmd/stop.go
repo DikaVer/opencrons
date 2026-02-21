@@ -1,3 +1,6 @@
+// File stop.go implements the stop daemon command. It sends an interrupt signal
+// to the running daemon process, waits up to 10 seconds for graceful shutdown,
+// then force kills if necessary and cleans up the PID file.
 package cmd
 
 import (
@@ -5,13 +8,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the scheduler daemon",
+	Short: "Stop the OpenCron daemon",
 	RunE:  runStop,
 }
 

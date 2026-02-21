@@ -1,3 +1,9 @@
+// Package daemon implements the main OpenCron daemon that orchestrates cron
+// job scheduling, file system watching for hot-reload, and the Telegram bot.
+// The Daemon struct wraps robfig/cron with SkipIfStillRunning to prevent
+// overlapping job execution, manages job registration and atomic hot-reload,
+// maintains a PID file for single-instance enforcement, opens the SQLite
+// database, and handles graceful shutdown on SIGINT/SIGTERM.
 package daemon
 
 import (
@@ -9,17 +15,18 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/chat"
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/executor"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/messenger/telegram"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/chat"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/executor"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/messenger/telegram"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/robfig/cron/v3"
 )
 
-// Daemon manages the cron scheduler lifecycle.
+// Daemon manages the cron job lifecycle.
 type Daemon struct {
 	cron    *cron.Cron
 	db      *storage.DB
@@ -32,7 +39,7 @@ type Daemon struct {
 
 // Run starts the daemon in the foreground.
 func Run() error {
-	stdlog := log.New(os.Stdout, "[scheduler] ", log.LstdFlags)
+	stdlog := log.New(os.Stdout, "[opencron] ", log.LstdFlags)
 
 	if err := platform.EnsureDirs(); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
@@ -53,7 +60,7 @@ func Run() error {
 
 	d := &Daemon{
 		cron: cron.New(
-			cron.WithParser(cron.NewParser(cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow)),
+			cron.WithParser(ui.CronParser),
 			cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)),
 		),
 		db:     db,
@@ -185,7 +192,7 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 
 		// Notify via Telegram if bot is running
 		if tgBot != nil {
-			tgBot.NotifyJobComplete(ctx, j.Name, result.Status)
+			tgBot.NotifyJobComplete(ctx, j.Name, result.Status, result.SummaryPath)
 		}
 	})
 	if err != nil {

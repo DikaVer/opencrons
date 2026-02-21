@@ -1,3 +1,8 @@
+// watcher.go implements a file system watcher using fsnotify for hot-reloading
+// job configurations. It monitors the schedules directory for Write, Create,
+// and Remove events on YAML files, debounces changes for 500ms, and triggers
+// Daemon.Reload to re-register all jobs atomically. Stop uses sync.Once to
+// prevent double-close panics.
 package daemon
 
 import (

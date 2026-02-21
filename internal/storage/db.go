@@ -1,3 +1,9 @@
+// Package storage provides a SQLite persistence layer using modernc.org/sqlite
+// (pure Go, no CGO). The DB type wraps sql.DB and opens the database with WAL
+// journal mode and a 5-second busy timeout. Schema migrations run automatically
+// on first open, creating the execution_logs, chat_sessions, and chat_messages
+// tables with appropriate indexes. CRUD operations cover execution log recording
+// and querying, chat session lifecycle management, and chat message logging.
 package storage
 
 import (

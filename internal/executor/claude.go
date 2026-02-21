@@ -1,3 +1,11 @@
+// claude.go builds the claude -p command for job execution. It embeds
+// task-preamble.txt and summary-prompt.txt via //go:embed, constructs the
+// full prompt (preamble + user prompt + optional summary injection), and
+// assembles CLI flags (--model, --permission-mode bypassPermissions,
+// --output-format json, --effort, --no-session-persistence). The prompt
+// is passed via stdin to avoid OS argument length limits and process list
+// exposure. BuildCommand returns an exec.Cmd ready to run, and BuildResult
+// holds the combined prompt text along with the constructed command.
 package executor
 
 import (
@@ -10,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/platform"
 )
 
 //go:embed summary-prompt.txt
@@ -21,8 +29,14 @@ var summaryPromptTemplate string
 //go:embed task-preamble.txt
 var taskPreamble string
 
+// BuildResult holds the constructed command and any metadata from the build process.
+type BuildResult struct {
+	Cmd         *exec.Cmd
+	SummaryPath string // non-empty if summary_enabled
+}
+
 // BuildCommand constructs the `claude -p` command for a job.
-func BuildCommand(ctx context.Context, job *config.JobConfig) (*exec.Cmd, error) {
+func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, error) {
 	args := []string{"-p"}
 
 	// Model
@@ -56,10 +70,12 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*exec.Cmd, error)
 	// Build final prompt: preamble + user prompt + optional summary injection
 	prompt := taskPreamble + string(promptContent)
 
+	var summaryPath string
+
 	// Append summary injection if enabled
 	if job.SummaryEnabled {
 		now := time.Now()
-		summaryPath := filepath.Join(platform.SummaryDir(), fmt.Sprintf("%s-%s.md", job.Name, now.Format("2006-01-02")))
+		summaryPath = filepath.Join(platform.SummaryDir(), fmt.Sprintf("%s-%s.md", job.Name, now.Format("2006-01-02")))
 		injection := strings.NewReplacer(
 			"{{SUMMARY_PATH}}", summaryPath,
 			"{{JOB_NAME}}", job.Name,
@@ -76,5 +92,5 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*exec.Cmd, error)
 
 	logger.Debug("Built command: claude %s (dir=%s)", strings.Join(args, " "), job.WorkingDir)
 
-	return cmd, nil
+	return &BuildResult{Cmd: cmd, SummaryPath: summaryPath}, nil
 }

@@ -1,3 +1,13 @@
+// Package chat provides chat session execution and lifecycle management
+// for interactive conversations with Claude Code via Telegram.
+//
+// Runner executes "claude -p" commands within a session context, piping
+// user messages via stdin and parsing the JSON output into ChatResult
+// values containing the response text, cost, and token usage.
+//
+// SessionManager (in session.go) maps Telegram users to persistent
+// session UUIDs stored in SQLite, enabling multi-turn conversations
+// through Claude Code's --session-id flag.
 package chat
 
 import (
@@ -9,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/storage"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/storage"
 )
 
 // chatOutput represents the JSON output from claude -p --output-format json.
@@ -40,11 +50,8 @@ func NewRunner() *Runner {
 }
 
 // Run sends a message to Claude in the context of a session and returns the response.
+// The caller controls the lifetime via ctx — there is no internal timeout.
 func (r *Runner) Run(ctx context.Context, session *storage.ChatSession, message string) (*ChatResult, error) {
-	// Apply timeout (120s for chat)
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-	defer cancel()
-
 	args := []string{
 		"-p",
 		"--session-id", session.ID,
@@ -72,8 +79,8 @@ func (r *Runner) Run(ctx context.Context, session *storage.ChatSession, message 
 	err := cmd.Run()
 	duration := time.Since(startTime)
 
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("response timed out after 120s")
+	if ctx.Err() == context.Canceled {
+		return nil, fmt.Errorf("query stopped")
 	}
 
 	if err != nil {

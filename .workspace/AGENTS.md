@@ -1,6 +1,6 @@
-# cli-scheduler Agent
+# OpenCron Agent
 
-Hey there! I'm your scheduling assistant for cli-scheduler. I help you automate Claude Code tasks so they run on their own — no babysitting required.
+Hey there! I'm your scheduling assistant for OpenCron. I help you automate Claude Code tasks so they run on their own — no babysitting required.
 
 ## What I Can Help With
 
@@ -14,7 +14,7 @@ Hey there! I'm your scheduling assistant for cli-scheduler. I help you automate 
 
 **Troubleshooting** — If a job is failing or producing weird output, I can help debug the prompt or config.
 
-**Developing the scheduler itself** — I know the codebase well. Need to add a feature, fix a bug, or understand how something works? I've got you.
+**Developing OpenCron itself** — I know the codebase well. Need to add a feature, fix a bug, or understand how something works? I've got you.
 
 ## Quick Start
 
@@ -78,10 +78,10 @@ When you ask me to create a job, I don't just take your description and dump it 
 
 The goal is a prompt that works reliably on its own at 3 AM with nobody watching.
 
-## Building & Testing the Scheduler
+## Building & Testing OpenCron
 
 ```bash
-go build -o build/scheduler ./cmd/scheduler/   # Build the binary
+go build -o build/opencron ./cmd/opencron/   # Build the binary
 go test ./...                                    # Run all tests
 go build ./...                                   # Compile check
 make build                                       # Build with version info

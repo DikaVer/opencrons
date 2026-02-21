@@ -1,3 +1,8 @@
+// File models.go defines the data models for the storage layer: ExecutionLog
+// (job execution record with token usage, cost, and status), UsageSummary
+// (aggregated run statistics), ChatSession (Telegram user-to-Claude session
+// mapping with model, effort, and working directory), and ChatMessage (logged
+// chat exchange for terminal echo and log viewing).
 package storage
 
 import "time"

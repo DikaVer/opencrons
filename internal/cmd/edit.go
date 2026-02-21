@@ -1,3 +1,7 @@
+// File edit.go implements the job edit command. It resolves the job name from CLI
+// args or an interactive picker via resolveJobName, loads the existing config and
+// prompt, runs RunEditWizard, and saves the updated config. resolveJobName is a
+// shared helper used by other commands that need to select a job.
 package cmd
 
 import (
@@ -5,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +55,10 @@ func editJob(name string) error {
 	result, err := tui.RunEditWizard(job, existingPrompt)
 	if err != nil {
 		return fmt.Errorf("edit wizard failed: %w", err)
+	}
+	if result == nil {
+		fmt.Println("  Cancelled.")
+		return nil
 	}
 
 	// Save prompt file

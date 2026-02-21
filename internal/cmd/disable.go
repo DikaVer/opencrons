@@ -1,10 +1,12 @@
+// File disable.go implements the disable command, which deactivates a job
+// by setting Enabled to false and saving the updated config.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 

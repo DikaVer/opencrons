@@ -1,34 +1,34 @@
-# cli-scheduler
+# opencron
 
-CLI scheduler that runs Claude Code (`claude -p`) jobs on cron schedules, with Telegram bot integration for remote chat and job management. Go + Cobra + charmbracelet TUI.
+OpenCron runs Claude Code (`claude -p`) jobs on cron schedules, with Telegram bot integration for remote chat and job management. Go + Cobra + charmbracelet TUI.
 
 ## Commands
 
 ```bash
 # Build & test
-go build -o build/scheduler ./cmd/scheduler/
+go build -o build/opencron ./cmd/opencron/
 go test ./...
 go build ./...          # compile check all packages
 make build              # build with version ldflags
 make lint               # golangci-lint
 
 # CLI subcommands
-scheduler                # interactive TUI menu
-scheduler setup          # run (or re-run) the setup wizard
-scheduler settings       # manage provider, messenger, chat, debug settings
-scheduler add            # create a new job (wizard or flags)
-scheduler list           # list all jobs
-scheduler run <name>     # execute a job immediately
-scheduler edit <name>    # edit job config
-scheduler enable <name>  # enable a job
-scheduler disable <name> # disable a job
-scheduler remove <name>  # delete job + prompt file
-scheduler logs [name]    # view execution logs
-scheduler start          # start daemon (foreground, includes Telegram bot)
-scheduler stop           # stop running daemon
-scheduler status         # check daemon status
-scheduler validate       # validate all job configs
-scheduler debug [on|off] # toggle debug logging
+opencron                # interactive TUI menu
+opencron setup          # run (or re-run) the setup wizard
+opencron settings       # manage provider, messenger, chat, debug settings
+opencron add            # create a new job (wizard or flags)
+opencron list           # list all jobs
+opencron run <name>     # execute a job immediately
+opencron edit <name>    # edit job config
+opencron enable <name>  # enable a job
+opencron disable <name> # disable a job
+opencron remove <name>  # delete job + prompt file
+opencron logs [name]    # view execution logs
+opencron start          # start daemon (foreground, includes Telegram bot)
+opencron stop           # stop running daemon
+opencron status         # check daemon status
+opencron validate       # validate all job configs
+opencron debug [on|off] # toggle debug logging
 ```
 
 ## Architecture
@@ -36,7 +36,7 @@ scheduler debug [on|off] # toggle debug logging
 ### Package dependency graph
 
 ```
-cmd/scheduler/main.go
+cmd/opencron/main.go
   └→ internal/cmd/              Cobra commands + TUI menu loop
        ├→ internal/config/       JobConfig struct, YAML load/save, prompt file I/O
        ├→ internal/tui/          Interactive UI: menus, wizards, settings, validators (charmbracelet/huh)
@@ -53,9 +53,9 @@ cmd/scheduler/main.go
 
 ### Three modes of operation
 
-1. **Interactive TUI** (`scheduler` with no args): `root.go:runMainMenu()` loops → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
-2. **CLI subcommands** (`scheduler add`, `scheduler list`, etc.): Each `internal/cmd/*.go` registers a Cobra command.
-3. **Telegram bot** (inside daemon): Runs alongside cron in `scheduler start`. Handles `/new`, `/jobs`, `/model`, `/effort`, `/status`, `/help` commands + free-text chat with Claude.
+1. **Interactive TUI** (`opencron` with no args): `root.go:runMainMenu()` loops → `tui.RunMainMenu()` → dispatches to handlers → returns to menu.
+2. **CLI subcommands** (`opencron add`, `opencron list`, etc.): Each `internal/cmd/*.go` registers a Cobra command.
+3. **Telegram bot** (inside daemon): Runs alongside cron in `opencron start`. Handles `/new`, `/jobs`, `/model`, `/effort`, `/status`, `/help` commands + free-text chat with Claude.
 
 Shared logic lives in the `cmd` package as unexported functions so both modes reuse the same code.
 
@@ -89,7 +89,7 @@ Settings {
 
 - `execution_logs` — job execution records (status, cost, tokens, timestamps)
 - `chat_sessions` — maps Telegram userID → session UUID for `--session-id`
-- `chat_messages` — logged chat messages for visibility (terminal echo, `scheduler logs`)
+- `chat_messages` — logged chat messages for visibility (terminal echo, `opencron logs`)
 
 ### JobConfig fields (config/job.go)
 
@@ -110,9 +110,9 @@ Settings {
 
 | Platform | PID detection | Config path |
 |----------|--------------|-------------|
-| Windows | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\cli-scheduler\` |
-| Linux | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` or `$XDG_CONFIG_HOME/cli-scheduler/` |
-| macOS | `syscall.Signal(0)` (`lock_unix.go`) | `~/.cli-scheduler/` |
+| Windows | `OpenProcess` (`lock_windows.go`) | `%APPDATA%\opencron\` |
+| Linux | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencron/` or `$XDG_CONFIG_HOME/opencron/` |
+| macOS | `syscall.Signal(0)` (`lock_unix.go`) | `~/.opencron/` |
 
 ### Runtime config directory
 
@@ -123,14 +123,14 @@ Settings {
   ├── logs/               # stdout (.json) / stderr (.log) per execution
   ├── summary/            # Execution summaries (when summary_enabled)
   ├── workspace/          # CLAUDE.md + .claude/ (copied from .workspace/ during setup)
-  ├── data/scheduler.db   # SQLite (WAL mode)
+  ├── data/opencron.db   # SQLite (WAL mode)
   ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
-  └── scheduler.pid       # Daemon lock file
+  └── opencron.pid       # Daemon lock file
 ```
 
 ### Telegram bot architecture
 
-Bot runs inside the daemon (`scheduler start`). Single process — no IPC needed.
+Bot runs inside the daemon (`opencron start`). Single process — no IPC needed.
 
 **Commands:** `/new` (clear session), `/jobs` (inline keyboard job list), `/model` (inline keyboard model picker), `/effort` (inline keyboard effort picker), `/status` (daemon + session info), `/help`
 
@@ -154,7 +154,7 @@ Bot runs inside the daemon (`scheduler start`). Single process — no IPC needed
 - **Embedded files:** `executor/task-preamble.txt` and `executor/summary-prompt.txt` are `//go:embed`-ed — changes require rebuild
 - **Prompt piped via stdin:** Prompt content is passed via stdin (not CLI args) to avoid OS argument length limits and process list exposure
 - **TUI library:** Uses `charmbracelet/huh` for forms and `lipgloss` for styling — Catppuccin Mocha color palette (`#cba6f7` purple, `#a6e3a1` green, `#f38ba8` red, `#fab387` orange, `#6c7086` dim)
-- **Debug logging:** Gated by `settings.json` — only writes to `logs/scheduler-debug.log` when `platform.IsDebugEnabled()` returns true
+- **Debug logging:** Gated by `settings.json` — only writes to `logs/opencron-debug.log` when `platform.IsDebugEnabled()` returns true
 - **Job name validation:** Alphanumeric + hyphens + underscores only
 - **Prompt file security:** Must be relative path, no `..` traversal, no absolute paths
 - **Model validation:** Only allows `sonnet`, `opus`, `haiku` and their full model IDs

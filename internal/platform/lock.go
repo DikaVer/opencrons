@@ -1,3 +1,9 @@
+// Package platform provides PID file management and daemon process detection.
+//
+// WritePID, ReadPID, and RemovePID handle lock file I/O for the daemon's PID file.
+// IsRunning delegates to the platform-specific isProcessRunning implementation.
+// CheckDaemonRunning combines PID file reading with liveness checking and
+// automatically cleans up stale PID files from crashed daemons.
 package platform
 
 import (

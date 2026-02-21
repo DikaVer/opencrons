@@ -1,3 +1,7 @@
+// File add.go implements the job creation command. It supports both an interactive
+// wizard via RunAddWizard and a non-interactive mode via flags (--name, --schedule,
+// --working-dir, --prompt-file, --prompt-content, --model, --effort, --timeout,
+// --summary). It validates inputs, saves the prompt file, and writes the job config.
 package cmd
 
 import (
@@ -5,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/tui"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +56,10 @@ func runAddInteractive() error {
 	result, err := tui.RunAddWizard()
 	if err != nil {
 		return fmt.Errorf("wizard failed: %w", err)
+	}
+	if result == nil {
+		fmt.Println("  Cancelled.")
+		return nil
 	}
 
 	// Save prompt file

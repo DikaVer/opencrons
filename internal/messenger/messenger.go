@@ -1,3 +1,6 @@
+// Package messenger defines the Messenger interface for pluggable messaging
+// platform integrations. Each implementation (e.g. Telegram) provides
+// Start/Stop lifecycle, message sending, and user authorization.
 package messenger
 
 import "context"

@@ -1,3 +1,11 @@
+// Package platform provides cross-platform directory path resolution for the
+// OpenCron's runtime configuration layout.
+//
+// BaseDir returns the root configuration directory (with a test override mechanism).
+// Derived paths include SchedulesDir, PromptsDir, LogsDir, SummaryDir, DataDir,
+// DBPath, PIDFile, and WorkspaceDir. EnsureDirs creates all required directories
+// on first run. The actual default base directory is resolved by platform-specific
+// implementations of defaultBaseDir.
 package platform
 
 import (
@@ -47,12 +55,12 @@ func DataDir() string {
 
 // DBPath returns the full path to the SQLite database file.
 func DBPath() string {
-	return filepath.Join(DataDir(), "scheduler.db")
+	return filepath.Join(DataDir(), "opencron.db")
 }
 
 // PIDFile returns the path to the PID file.
 func PIDFile() string {
-	return filepath.Join(BaseDir(), "scheduler.pid")
+	return filepath.Join(BaseDir(), "opencron.pid")
 }
 
 // WorkspaceDir returns the path to the workspace directory (CLAUDE.md + .claude/).

@@ -1,3 +1,8 @@
+// Package config defines the JobConfig struct and its YAML serialization for
+// scheduled job configuration. It provides validation for all job fields
+// including name format, cron schedule syntax, prompt file path security
+// (rejecting traversal and absolute paths), working directory existence,
+// model selection, effort level, and timeout bounds.
 package config
 
 import (
@@ -6,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/robfig/cron/v3"
+	"github.com/dika-maulidal/opencron/internal/ui"
 )
 
 // JobConfig represents a single scheduled job configuration.
@@ -43,15 +48,12 @@ func (j *JobConfig) Validate() error {
 	}
 
 	// Validate name (alphanumeric, hyphens, underscores)
-	for _, c := range j.Name {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
-			return fmt.Errorf("job name %q contains invalid character %q (use alphanumeric, hyphens, underscores)", j.Name, string(c))
-		}
+	if err := ui.ValidateJobName(j.Name); err != nil {
+		return fmt.Errorf("job name %q: %w", j.Name, err)
 	}
 
 	// Validate cron schedule
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	if _, err := parser.Parse(j.Schedule); err != nil {
+	if _, err := ui.CronParser.Parse(j.Schedule); err != nil {
 		return fmt.Errorf("job %q: invalid cron schedule %q: %w", j.Name, j.Schedule, err)
 	}
 

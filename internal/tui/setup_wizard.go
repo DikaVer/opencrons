@@ -1,15 +1,22 @@
+// setup_wizard.go implements the first-time setup wizard.
+//
+// SetupResult holds the wizard output. RunSetupWizard guides the user through a
+// 4-step flow: provider detection, messenger configuration with Telegram pairing
+// (via PairingBot for code-based verification), chat model defaults (model and
+// effort), and daemon mode selection. runTelegramSetup handles bot token input and
+// the pairing handshake. runChatModelForm collects model and effort preferences.
 package tui
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
-	"github.com/dika-maulidal/cli-scheduler/internal/provider"
+	"github.com/dika-maulidal/opencron/internal/messenger/telegram"
+	"github.com/dika-maulidal/opencron/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/provider"
+	"github.com/dika-maulidal/opencron/internal/ui"
 )
 
 // SetupResult holds the output of the setup wizard.
@@ -22,24 +29,16 @@ type SetupResult struct {
 
 // RunSetupWizard runs the first-time setup wizard.
 func RunSetupWizard() (*SetupResult, error) {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#cba6f7"))
-	dimStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6c7086"))
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#a6e3a1"))
-
 	// Step 1: Welcome
 	fmt.Println()
-	fmt.Println(titleStyle.Render("  Welcome to CLI Scheduler"))
+	fmt.Println(ui.Title.Render("  Welcome to OpenCron"))
 	fmt.Println()
-	fmt.Println(dimStyle.Render("  CLI Scheduler runs Claude Code tasks on cron schedules."))
-	fmt.Println(dimStyle.Render("  This wizard will help you set up your environment."))
+	fmt.Println(ui.Dim.Render("  OpenCron runs Claude Code tasks on cron schedules."))
+	fmt.Println(ui.Dim.Render("  This wizard will help you set up your environment."))
 	fmt.Println()
 
 	// Step 2: Provider detection
-	fmt.Println(titleStyle.Render("  Step 1: AI Provider"))
+	fmt.Println(ui.Title.Render("  Step 1: AI Provider"))
 	fmt.Println()
 
 	var providerID string
@@ -67,19 +66,19 @@ func RunSetupWizard() (*SetupResult, error) {
 
 	for !p.Detect() {
 		fmt.Println()
-		fmt.Println(dimStyle.Render("  Claude Code CLI not found on PATH."))
-		fmt.Println(dimStyle.Render("  Install it: npm install -g @anthropic-ai/claude-code"))
+		fmt.Println(ui.Dim.Render("  Claude Code CLI not found on PATH."))
+		fmt.Println(ui.Dim.Render("  Install it: npm install -g @anthropic-ai/claude-code"))
 		fmt.Println()
 		PrintPressEnter()
 	}
 
 	if version := p.Version(); version != "" {
-		fmt.Printf("  %s %s\n", dimStyle.Render("Claude Code:"), successStyle.Render(version))
+		fmt.Printf("  %s %s\n", ui.Dim.Render("Claude Code:"), ui.Success.Render(version))
 	}
 	fmt.Println()
 
 	// Step 3: Messenger
-	fmt.Println(titleStyle.Render("  Step 2: Messenger Integration"))
+	fmt.Println(ui.Title.Render("  Step 2: Messenger Integration"))
 	fmt.Println()
 
 	var messengerType string
@@ -89,8 +88,8 @@ func RunSetupWizard() (*SetupResult, error) {
 				Title("Messenger Platform").
 				Description("Connect a messenger to chat with Claude and manage jobs remotely.").
 				Options(
-					huh.NewOption("Telegram                Chat with Claude + manage jobs via Telegram bot", "telegram"),
-					huh.NewOption("Skip                    Use TUI only (can configure later in Settings)", ""),
+					huh.NewOption("Telegram", "telegram"),
+					huh.NewOption("Skip (TUI only)", ""),
 				).
 				Value(&messengerType),
 		),
@@ -110,23 +109,27 @@ func RunSetupWizard() (*SetupResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		result.Messenger = msgSettings
+		if msgSettings != nil {
+			result.Messenger = msgSettings
 
-		// Step 5: Chat defaults
-		fmt.Println()
-		fmt.Println(titleStyle.Render("  Step 3: Chat Defaults"))
-		fmt.Println()
+			// Step 5: Chat Model
+			fmt.Println()
+			fmt.Println(ui.Title.Render("  Step 3: Chat Model"))
+			fmt.Println()
 
-		chatSettings, err := runChatDefaultsForm()
-		if err != nil {
-			return nil, err
+			chatSettings, err := runChatModelForm()
+			if err != nil {
+				return nil, err
+			}
+			if chatSettings != nil {
+				result.Chat = chatSettings
+			}
 		}
-		result.Chat = chatSettings
 	}
 
 	// Step 6: Daemon mode
 	fmt.Println()
-	fmt.Println(titleStyle.Render("  Step 4: Daemon Configuration"))
+	fmt.Println(ui.Title.Render("  Step 4: Daemon Configuration"))
 	fmt.Println()
 
 	var daemonMode string
@@ -134,10 +137,10 @@ func RunSetupWizard() (*SetupResult, error) {
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Daemon Mode").
-				Description("How should the scheduler daemon run?").
+				Description("How should the OpenCron daemon run?").
 				Options(
-					huh.NewOption("Background process      Start manually with 'scheduler start'", "background"),
-					huh.NewOption("System service          Auto-start on boot (requires admin)", "service"),
+					huh.NewOption("Background process", "background"),
+					huh.NewOption("System service (auto-start on boot)", "service"),
 				).
 				Value(&daemonMode),
 		),
@@ -150,21 +153,19 @@ func RunSetupWizard() (*SetupResult, error) {
 
 	// Done
 	fmt.Println()
-	fmt.Println(successStyle.Render("  Setup complete!"))
+	fmt.Println(ui.Success.Render("  Setup complete!"))
 	fmt.Println()
 
 	return result, nil
 }
 
-// runTelegramSetup handles the Telegram bot configuration flow.
+// runTelegramSetup handles the Telegram bot configuration flow with code-based pairing.
 func runTelegramSetup() (*platform.MessengerSettings, error) {
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-
 	fmt.Println()
-	fmt.Println(dimStyle.Render("  Create a bot with @BotFather on Telegram to get your token."))
-	fmt.Println(dimStyle.Render("  1. Open Telegram and search for @BotFather"))
-	fmt.Println(dimStyle.Render("  2. Send /newbot and follow the instructions"))
-	fmt.Println(dimStyle.Render("  3. Copy the HTTP API token"))
+	fmt.Println(ui.Dim.Render("  Create a bot with @BotFather on Telegram to get your token."))
+	fmt.Println(ui.Dim.Render("  1. Open Telegram and search for @BotFather"))
+	fmt.Println(ui.Dim.Render("  2. Send /newbot and follow the instructions"))
+	fmt.Println(ui.Dim.Render("  3. Copy the HTTP API token"))
 	fmt.Println()
 
 	var botToken string
@@ -189,165 +190,159 @@ func runTelegramSetup() (*platform.MessengerSettings, error) {
 	).WithTheme(theme)
 
 	if err := tokenForm.Run(); err != nil {
+		if IsAborted(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	botToken = strings.TrimSpace(botToken)
 
-	// Pairing mode
-	var pairingMode string
-	pairingForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("User Authorization").
-				Description("How should the bot verify who can use it?").
-				Options(
-					huh.NewOption("Pairing token           Generate a code, send it to your bot to pair", "gatherToken"),
-					huh.NewOption("Allow list              Manually enter Telegram user IDs or @usernames", "allowList"),
-				).
-				Value(&pairingMode),
-		),
-	).WithTheme(theme)
+	// Start pairing bot to validate token and begin code-based pairing
+	fmt.Println()
+	fmt.Println(ui.Dim.Render("  Verifying bot token..."))
 
-	if err := pairingForm.Run(); err != nil {
-		return nil, err
+	pb, err := telegram.StartPairingBot(botToken)
+	if err != nil {
+		return nil, fmt.Errorf("bot token error: %w", err)
+	}
+	defer pb.Stop()
+
+	if pb.BotName() != "" {
+		fmt.Println(ui.Success.Render(fmt.Sprintf("  Bot @%s is running!", pb.BotName())))
+	} else {
+		fmt.Println(ui.Success.Render("  Bot is running!"))
 	}
 
 	settings := &platform.MessengerSettings{
 		Type:         "telegram",
 		BotToken:     botToken,
-		Pairing:      pairingMode,
 		AllowedUsers: make(map[string]bool),
 	}
 
-	if pairingMode == "gatherToken" {
-		// Generate pairing code
-		code := generatePairingCode()
+	// Code-based pairing loop
+	for {
 		fmt.Println()
-		fmt.Printf("  Your pairing code: %s\n", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f5c2e7")).Render(code))
-		fmt.Println()
-		fmt.Println(dimStyle.Render("  Send any message to your bot on Telegram."))
-		fmt.Println(dimStyle.Render("  The bot will reply with your pairing code."))
-		fmt.Println(dimStyle.Render("  Enter the code below to confirm pairing."))
+		fmt.Println(ui.Dim.Render("  Send any message to your bot in Telegram."))
+		fmt.Println(ui.Dim.Render("  You'll receive a 6-digit pairing code — enter it below."))
 		fmt.Println()
 
-		// Store the code for later verification during bot startup
-		// For now, we save the code as a special allowed_users entry
-		// The actual pairing happens when the bot starts in the daemon
-		settings.AllowedUsers["__pairing_code__"] = false
-		settings.AllowedUsers["__code:"+code+"__"] = true
-
-		var confirmCode string
-		confirmForm := huh.NewForm(
+		var code string
+		codeForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("Confirm Pairing Code").
-					Description("Enter the code your bot sent you to confirm pairing.").
-					Value(&confirmCode).
+					Title("Pairing Code").
+					Description("Enter the 6-digit code from Telegram.").
+					Placeholder("000000").
+					Value(&code).
 					Validate(func(s string) error {
-						if strings.TrimSpace(s) == "" {
-							return fmt.Errorf("code is required")
+						s = strings.TrimSpace(s)
+						if s == "" {
+							return fmt.Errorf("pairing code is required")
 						}
-						if strings.TrimSpace(s) != code {
-							return fmt.Errorf("code does not match — check your Telegram bot")
+						if len(s) != 6 {
+							return fmt.Errorf("code must be 6 digits")
 						}
 						return nil
 					}),
 			),
 		).WithTheme(theme)
 
-		if err := confirmForm.Run(); err != nil {
+		if err := codeForm.Run(); err != nil {
+			if IsAborted(err) {
+				return nil, nil
+			}
 			return nil, err
 		}
+		code = strings.TrimSpace(code)
 
-		// Clean up pairing entries — actual user will be added when bot starts
-		delete(settings.AllowedUsers, "__pairing_code__")
-		delete(settings.AllowedUsers, "__code:"+code+"__")
-		settings.AllowedUsers["__pending_pairing__"] = true
+		result, err := pb.ValidateCode(code)
+		if err != nil {
+			fmt.Println(ui.Fail.Render("  Invalid code. Make sure you sent a message to the bot and try again."))
+			continue
+		}
 
-	} else {
-		// Allow list mode
-		for {
-			var userID string
-			userForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewInput().
-						Title("Telegram User").
-						Description("Enter a Telegram @username or numeric user ID.").
-						Placeholder("@username or 123456789").
-						Value(&userID).
-						Validate(func(s string) error {
-							if strings.TrimSpace(s) == "" {
-								return fmt.Errorf("user ID is required")
-							}
-							return nil
-						}),
-				),
-			).WithTheme(theme)
+		settings.AllowedUsers[strconv.FormatInt(result.UserID, 10)] = true
 
-			if err := userForm.Run(); err != nil {
-				return nil, err
-			}
+		displayName := fmt.Sprintf("%d", result.UserID)
+		if result.Username != "" {
+			displayName = fmt.Sprintf("@%s (%d)", result.Username, result.UserID)
+		} else if result.Name != "" {
+			displayName = fmt.Sprintf("%s (%d)", result.Name, result.UserID)
+		}
 
-			settings.AllowedUsers[strings.TrimSpace(userID)] = true
+		fmt.Println(ui.Accent.Render(fmt.Sprintf("  Paired with %s", displayName)))
 
-			addMore, err := ConfirmAction("Add another user?", "")
-			if err != nil {
-				return nil, err
-			}
-			if !addMore {
-				break
-			}
+		addMore, err := ConfirmAction("Add another user?", "")
+		if err != nil {
+			return nil, err
+		}
+		if !addMore {
+			break
 		}
 	}
 
+	fmt.Println()
 	return settings, nil
 }
 
-// runChatDefaultsForm gets chat default settings.
-func runChatDefaultsForm() (*platform.ChatSettings, error) {
-	var model, effort string
-
-	form := huh.NewForm(
+// runChatModelForm gets chat model settings.
+// Returns nil, nil if user chose back.
+func runChatModelForm() (*platform.ChatSettings, error) {
+	var model string
+	modelForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Default Chat Model").
 				Description("Which model to use for Telegram chat sessions.").
 				Options(
-					huh.NewOption("Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
-					huh.NewOption("Opus — most capable, best for complex reasoning", "opus"),
-					huh.NewOption("Haiku — fastest, cheapest, good for simple tasks", "haiku"),
+					huh.NewOption("Sonnet (recommended)", "sonnet"),
+					huh.NewOption("Opus", "opus"),
+					huh.NewOption("Haiku", "haiku"),
+					huh.NewOption("<< Back", "__back__"),
 				).
 				Value(&model),
+		),
+	).WithTheme(theme)
+
+	if err := modelForm.Run(); err != nil {
+		if IsAborted(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if model == "__back__" {
+		return nil, nil
+	}
+
+	var effort string
+	effortForm := huh.NewForm(
+		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Default Effort Level").
 				Description("Controls how much thinking effort Claude uses.").
 				Options(
-					huh.NewOption("High — full capability (recommended)", "high"),
-					huh.NewOption("Medium — balanced speed and cost", "medium"),
-					huh.NewOption("Low — most token-efficient", "low"),
-					huh.NewOption("Max — absolute maximum (Opus only)", "max"),
+					huh.NewOption("High (recommended)", "high"),
+					huh.NewOption("Medium", "medium"),
+					huh.NewOption("Low", "low"),
+					huh.NewOption("Max (Opus only)", "max"),
+					huh.NewOption("<< Back", "__back__"),
 				).
 				Value(&effort),
 		),
 	).WithTheme(theme)
 
-	if err := form.Run(); err != nil {
+	if err := effortForm.Run(); err != nil {
+		if IsAborted(err) {
+			return nil, nil
+		}
 		return nil, err
+	}
+	if effort == "__back__" {
+		return nil, nil
 	}
 
 	return &platform.ChatSettings{
 		Model:  model,
 		Effort: effort,
 	}, nil
-}
-
-// generatePairingCode creates a random 6-character alphanumeric code.
-func generatePairingCode() string {
-	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no I/O/0/1 to avoid confusion
-	code := make([]byte, 6)
-	for i := range code {
-		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		code[i] = chars[n.Int64()]
-	}
-	return string(code)
 }

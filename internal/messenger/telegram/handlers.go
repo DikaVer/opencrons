@@ -1,18 +1,42 @@
+// handlers.go implements Telegram bot command and callback query handlers.
+//
+// Commands: /new (clear session), /stop (cancel running query), /jobs
+// (inline keyboard job list), /model (model picker), /effort (effort picker),
+// /status (daemon and session info), /help. Callback handlers process job
+// actions (select, enable, disable, run, back) and model/effort selection
+// from inline keyboards. NotifyJobComplete broadcasts job results to all
+// authorized users.
 package telegram
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/executor"
-	"github.com/dika-maulidal/cli-scheduler/internal/logger"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/executor"
+	"github.com/dika-maulidal/opencron/internal/logger"
+	"github.com/dika-maulidal/opencron/internal/platform"
 )
+
+func (b *Bot) handleStopQuery(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	userID := update.Message.From.ID
+	chatID := update.Message.Chat.ID
+
+	cancelVal, ok := b.cancels.Load(userID)
+	if !ok {
+		b.SendPlain(ctx, chatID, "No active query to stop.")
+		return
+	}
+
+	cancelFunc := cancelVal.(context.CancelFunc)
+	cancelFunc()
+	b.stdlog.Printf("[telegram] User %d stopped active query", userID)
+}
 
 func (b *Bot) handleNew(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	userID := update.Message.From.ID
@@ -158,10 +182,11 @@ func (b *Bot) handleStatus(ctx context.Context, tgBot *bot.Bot, update *models.U
 func (b *Bot) handleHelp(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	chatID := update.Message.Chat.ID
 
-	help := `CLI Scheduler Bot
+	help := `OpenCron Bot
 
 Commands:
 /new - Start a fresh chat session
+/stop - Stop the current running query
 /jobs - List and manage scheduled jobs
 /model - Change the Claude model
 /effort - Change the effort level
@@ -295,6 +320,19 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		return
 	}
 
+	// If summary file exists, send that instead of a generic message
+	if result.SummaryPath != "" {
+		data, err := os.ReadFile(result.SummaryPath)
+		if err == nil && len(data) > 0 {
+			summary := strings.TrimSpace(string(data))
+			if sendErr := b.Send(ctx, chatID, summary); sendErr != nil {
+				b.SendPlain(ctx, chatID, summary)
+			}
+			b.stdlog.Printf("[telegram] Job %q executed: status=%s (summary sent)", jobName, result.Status)
+			return
+		}
+	}
+
 	msg := fmt.Sprintf("Job %q finished\nStatus: %s\nDuration: %s", jobName, result.Status, result.Duration.Round(1e9))
 	if result.CostUSD > 0 {
 		msg += fmt.Sprintf("\nCost: $%.4f", result.CostUSD)
@@ -366,19 +404,33 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 }
 
 // NotifyJobComplete sends a job completion notification to all authorized chats.
-func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status string) {
+// If summaryPath is non-empty and the file exists, the summary content is included.
+func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, summaryPath string) {
 	msg := fmt.Sprintf("Job '%s' completed: %s", jobName, status)
 
-	// Notify all active sessions' chat IDs
+	// Read summary file if available
+	if summaryPath != "" {
+		data, err := os.ReadFile(summaryPath)
+		if err == nil && len(data) > 0 {
+			summary := strings.TrimSpace(string(data))
+			msg = summary // Replace generic message with the formatted summary
+		}
+	}
+
+	// Notify all authorized users
 	for userStr, allowed := range b.settings.AllowedUsers {
 		if !allowed || strings.HasPrefix(userStr, "__") {
 			continue
 		}
-		// We stored user IDs, but we need chat IDs. For private chats, chatID == userID.
+		// For private chats, chatID == userID
 		var userID int64
 		fmt.Sscanf(userStr, "%d", &userID)
 		if userID > 0 {
-			b.SendPlain(ctx, userID, msg)
+			// Try markdown first (summaries use Telegram-style markdown),
+			// fall back to plain text
+			if err := b.Send(ctx, userID, msg); err != nil {
+				b.SendPlain(ctx, userID, msg)
+			}
 		}
 	}
 }

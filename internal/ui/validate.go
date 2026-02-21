@@ -1,11 +1,15 @@
-package tui
+// validate.go provides input validation functions for TUI forms.
+//
+// ValidateJobName ensures names contain only alphanumeric characters, hyphens, and
+// underscores. ValidateDirectory checks that a path exists and is a directory.
+// ValidateCron verifies a valid 5-field cron expression. ValidateNonEmpty rejects
+// blank input.
+package ui
 
 import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/robfig/cron/v3"
 )
 
 // ValidateJobName checks that a job name is valid.
@@ -41,8 +45,7 @@ func ValidateCron(s string) error {
 	if strings.TrimSpace(s) == "" {
 		return fmt.Errorf("schedule is required")
 	}
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	if _, err := parser.Parse(s); err != nil {
+	if _, err := CronParser.Parse(s); err != nil {
 		return fmt.Errorf("invalid cron expression: %v", err)
 	}
 	return nil

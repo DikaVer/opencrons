@@ -1,3 +1,7 @@
+// Package provider defines the Provider interface for AI backend integrations
+// and maintains a global registry of known providers. Providers are looked up
+// by ID via Get or enumerated via List. Currently the only registered provider
+// is "anthropic" (Claude Code).
 package provider
 
 // Provider represents an AI provider that can run tasks.

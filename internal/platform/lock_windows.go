@@ -1,5 +1,11 @@
 //go:build windows
 
+// Package platform provides Windows process detection using the Win32 API.
+//
+// Process liveness is checked by calling windows.OpenProcess with
+// PROCESS_QUERY_LIMITED_INFORMATION access. If the process handle can be
+// opened successfully, the process is considered running. The handle is
+// closed immediately after the check.
 package platform
 
 import (

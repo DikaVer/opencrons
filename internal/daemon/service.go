@@ -1,3 +1,7 @@
+// service.go provides a system service wrapper using kardianos/service for
+// running the OpenCron daemon as a Windows Service or systemd unit. It
+// implements the service.Interface (Start/Stop) and exposes InstallService
+// and UninstallService functions for managing the service lifecycle.
 package daemon
 
 import (
@@ -8,10 +12,10 @@ import (
 	"github.com/kardianos/service"
 )
 
-// schedulerService implements the kardianos/service Interface.
-type schedulerService struct{}
+// opencronService implements the kardianos/service Interface.
+type opencronService struct{}
 
-func (s *schedulerService) Start(_ service.Service) error {
+func (s *opencronService) Start(_ service.Service) error {
 	go func() {
 		if err := Run(); err != nil {
 			log.Printf("Daemon error: %v", err)
@@ -21,14 +25,14 @@ func (s *schedulerService) Start(_ service.Service) error {
 	return nil
 }
 
-func (s *schedulerService) Stop(_ service.Service) error {
+func (s *opencronService) Stop(_ service.Service) error {
 	// Daemon handles shutdown via signal
 	p, _ := os.FindProcess(os.Getpid())
 	p.Signal(os.Interrupt)
 	return nil
 }
 
-// InstallService installs the scheduler as a system service.
+// InstallService installs OpenCron as a system service.
 func InstallService() error {
 	execPath, err := os.Executable()
 	if err != nil {
@@ -36,14 +40,14 @@ func InstallService() error {
 	}
 
 	svcConfig := &service.Config{
-		Name:        "cli-scheduler",
-		DisplayName: "CLI Scheduler",
-		Description: "Scheduler daemon for Claude Code automation jobs",
+		Name:        "opencron",
+		DisplayName: "OpenCron",
+		Description: "OpenCron daemon for Claude Code automation jobs",
 		Arguments:   []string{"start"},
 		Executable:  execPath,
 	}
 
-	svc, err := service.New(&schedulerService{}, svcConfig)
+	svc, err := service.New(&opencronService{}, svcConfig)
 	if err != nil {
 		return fmt.Errorf("creating service: %w", err)
 	}
@@ -53,17 +57,17 @@ func InstallService() error {
 	}
 
 	fmt.Println("Service installed successfully.")
-	fmt.Println("Start it with: scheduler start (or via system service manager)")
+	fmt.Println("Start it with: opencron start (or via system service manager)")
 	return nil
 }
 
 // UninstallService removes the system service.
 func UninstallService() error {
 	svcConfig := &service.Config{
-		Name: "cli-scheduler",
+		Name: "opencron",
 	}
 
-	svc, err := service.New(&schedulerService{}, svcConfig)
+	svc, err := service.New(&opencronService{}, svcConfig)
 	if err != nil {
 		return fmt.Errorf("creating service: %w", err)
 	}

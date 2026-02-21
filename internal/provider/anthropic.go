@@ -1,3 +1,6 @@
+// File anthropic.go implements the Provider interface for Anthropic's Claude Code CLI.
+// It detects the claude binary on PATH via exec.LookPath, verifies authentication
+// by running "claude --version", and reports the installed CLI version string.
 package provider
 
 import (

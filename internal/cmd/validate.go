@@ -1,10 +1,13 @@
+// File validate.go implements the validate command, which checks all job configs
+// and their associated prompt files for correctness. It reports OK, FAIL, or WARN
+// status per job.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/config"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/config"
+	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 

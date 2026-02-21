@@ -1,16 +1,19 @@
+// File start.go implements the start daemon command. It supports a --install flag
+// for system service installation and checks whether the daemon is already running
+// before launching.
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/dika-maulidal/cli-scheduler/internal/daemon"
-	"github.com/dika-maulidal/cli-scheduler/internal/platform"
+	"github.com/dika-maulidal/opencron/internal/daemon"
+	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/spf13/cobra"
 )
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start the scheduler daemon",
+	Short: "Start the OpenCron daemon",
 	RunE:  runStart,
 }
 
@@ -36,6 +39,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("daemon already running (PID %d)", pid)
 	}
 
-	fmt.Println("Starting scheduler daemon...")
+	fmt.Println("Starting OpenCron daemon...")
 	return daemon.Run()
 }
