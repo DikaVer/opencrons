@@ -408,35 +408,44 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 }
 
 // NotifyJobComplete sends a job completion notification to all authorized chats.
-// If summaryPath is non-empty and the file exists, the summary content is included.
+// If summaryPath is non-empty and the file exists, the summary content is sent.
 func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, summaryPath string) {
 	msg := fmt.Sprintf("Job '%s' completed: %s", jobName, status)
 
 	// Read summary file if available
 	if summaryPath != "" {
 		data, err := os.ReadFile(summaryPath)
-		if err == nil && len(data) > 0 {
-			summary := strings.TrimSpace(string(data))
-			msg = summary // Replace generic message with the formatted summary
+		if err != nil {
+			logger.Debug("NotifyJobComplete: failed to read summary %s: %v", summaryPath, err)
+			b.stdlog.Printf("[telegram] Job %q summary file not found: %s", jobName, summaryPath)
+		} else if len(data) > 0 {
+			msg = strings.TrimSpace(string(data))
+			logger.Debug("NotifyJobComplete: sending summary for %q (%d bytes)", jobName, len(data))
 		}
 	}
 
 	// Notify all authorized users
+	sent := 0
 	for userStr, allowed := range b.settings.AllowedUsers {
 		if !allowed || strings.HasPrefix(userStr, "__") {
 			continue
 		}
-		// For private chats, chatID == userID
 		var userID int64
 		fmt.Sscanf(userStr, "%d", &userID)
 		if userID > 0 {
-			// Try markdown first (summaries use Telegram-style markdown),
-			// fall back to plain text
 			if err := b.Send(ctx, userID, msg); err != nil {
-				b.SendPlain(ctx, userID, msg)
+				logger.Debug("NotifyJobComplete: HTML send failed for user %d: %v, falling back to plain", userID, err)
+				if plainErr := b.SendPlain(ctx, userID, msg); plainErr != nil {
+					logger.Debug("NotifyJobComplete: plain send also failed for user %d: %v", userID, plainErr)
+				} else {
+					sent++
+				}
+			} else {
+				sent++
 			}
 		}
 	}
+	b.stdlog.Printf("[telegram] Job %q notification sent to %d user(s)", jobName, sent)
 }
 
 func modelLabel(model, current string) string {

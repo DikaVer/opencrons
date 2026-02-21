@@ -2,8 +2,8 @@
 //
 // WizardResult holds the resulting job configuration and prompt content.
 // RunAddWizard presents a 7-step form covering name, working directory, schedule
-// (presets or custom cron), prompt text, model, effort, timeout, summary toggle,
-// and disallowed tools. RunEditWizard allows modifying an existing job's
+// (presets or custom cron), prompt text, model, effort, allowed tools, timeout,
+// and summary toggle. RunEditWizard allows modifying an existing job's
 // configuration. Both wizards use the Catppuccin Mocha theme.
 package tui
 
@@ -25,7 +25,7 @@ var theme = func() *huh.Theme {
 	return t
 }()
 
-// claudeCodeTools defines the known Claude Code tools for the disallowed tools selector.
+// claudeCodeTools defines the known Claude Code tools for the allowed tools selector.
 var claudeCodeTools = []struct {
 	Name  string
 	Label string
@@ -42,7 +42,7 @@ var claudeCodeTools = []struct {
 	{"Task", "Task — spawn subagent tasks"},
 }
 
-// Tools that are ALLOWED by default in the add wizard (not pre-selected as disallowed).
+// Tools that are ALLOWED by default in the add wizard.
 var defaultAllowedTools = map[string]bool{
 	"Read": true, "Glob": true, "Grep": true, "WebFetch": true, "WebSearch": true,
 }
@@ -56,16 +56,15 @@ type WizardResult struct {
 // RunAddWizard runs the interactive wizard to create a new job.
 func RunAddWizard() (*WizardResult, error) {
 	var (
-		name              string
-		workingDir        string
-		schedule          string
-		presetKey         string
-		prompt            string
-		model             string
-		effort            string
-		timeout           string
-		disallowedTools   []string
-		summaryEnabled    bool
+		name           string
+		workingDir     string
+		schedule       string
+		presetKey      string
+		prompt         string
+		model          string
+		effort         string
+		timeout        string
+		summaryEnabled bool
 	)
 
 	cwd, _ := os.Getwd()
@@ -157,8 +156,32 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&effort),
 	)
 
-	// Step 6: Timeout & Summary
+	// Step 6: Allowed Tools — select which tools Claude can use
+	var allowedTools []string
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if defaultAllowedTools[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
 	step6 := huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("🔧 Allowed Tools").
+			Description("Selected tools will be AVAILABLE during job execution. Deselect to deny.").
+			Options(toolOptions...).
+			Value(&allowedTools).
+			Validate(func(t []string) error {
+				if len(t) == 0 {
+					return fmt.Errorf("at least one tool must be allowed")
+				}
+				return nil
+			}),
+	)
+
+	// Step 7: Timeout & Summary
+	step7 := huh.NewGroup(
 		huh.NewInput().
 			Title("⏱️  Timeout (seconds)").
 			Description("Maximum wall-clock time for the job. The process is killed if it exceeds this limit.\n"+
@@ -168,25 +191,8 @@ func RunAddWizard() (*WizardResult, error) {
 		huh.NewConfirm().
 			Title("📊 Enable Report Summarization").
 			Description(fmt.Sprintf("When enabled, Claude generates a short Telegram-style summary after each run.\n"+
-				"Summaries are saved to: %s", platform.SummaryDir())).
+				"Summaries are saved to: %s\nNote: Write tool will be automatically allowed.", platform.SummaryDir())).
 			Value(&summaryEnabled),
-	)
-
-	// Step 7: Disallowed Tools — default denies write/execute tools, allows read-only
-	var toolOptions []huh.Option[string]
-	for _, t := range claudeCodeTools {
-		opt := huh.NewOption(t.Label, t.Name)
-		if !defaultAllowedTools[t.Name] {
-			opt = opt.Selected(true)
-		}
-		toolOptions = append(toolOptions, opt)
-	}
-	step7 := huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("🚫 Disallowed Tools").
-			Description("Selected tools will be DENIED during job execution. Deselect to allow.").
-			Options(toolOptions...).
-			Value(&disallowedTools),
 	)
 
 	form := huh.NewForm(step1, step2, step3, step4, step5, step6, step7).
@@ -236,6 +242,11 @@ func RunAddWizard() (*WizardResult, error) {
 		effortVal = ""
 	}
 
+	// Summary requires Write tool — ensure it's allowed
+	if summaryEnabled {
+		allowedTools = ensureAllowed(allowedTools, "Write")
+	}
+
 	// Build job config
 	job := &config.JobConfig{
 		ID:               uuid.New().String()[:8],
@@ -246,7 +257,7 @@ func RunAddWizard() (*WizardResult, error) {
 		Model:            model,
 		Timeout:          parseInt(timeout, 300),
 		Effort:           effortVal,
-		DisallowedTools:  nilIfEmpty(disallowedTools),
+		DisallowedTools:  nilIfEmpty(computeDisallowedTools(allowedTools)),
 		SummaryEnabled:   summaryEnabled,
 		NoSessionPersist: true,
 		Enabled:          true,
@@ -274,12 +285,12 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	}
 	summaryEnabled := job.SummaryEnabled
 
-	// Build set of currently disallowed tools for pre-selection
+	// Build set of currently disallowed tools to invert for the "allowed" UI
 	disabledSet := make(map[string]bool)
 	for _, t := range job.DisallowedTools {
 		disabledSet[t] = true
 	}
-	var disallowedTools []string
+	var allowedTools []string
 
 	fmt.Println(ui.Title.MarginBottom(1).Render(fmt.Sprintf("  ✏️  Edit Job: %s", job.Name)))
 
@@ -345,7 +356,31 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Value(&effort),
 	)
 
+	// Step 5: Allowed Tools — pre-select tools NOT in the disallowed list
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if !disabledSet[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
 	step5 := huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("🔧 Allowed Tools").
+			Description("Selected tools will be AVAILABLE during job execution. Deselect to deny.").
+			Options(toolOptions...).
+			Value(&allowedTools).
+			Validate(func(t []string) error {
+				if len(t) == 0 {
+					return fmt.Errorf("at least one tool must be allowed")
+				}
+				return nil
+			}),
+	)
+
+	// Step 6: Timeout & Summary
+	step6 := huh.NewGroup(
 		huh.NewInput().
 			Title("⏱️  Timeout (seconds)").
 			Description("Quick: 60-120s. Standard: 300s. Complex: 600-900s. Default: 300.").
@@ -354,25 +389,8 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		huh.NewConfirm().
 			Title("📊 Enable Report Summarization").
 			Description(fmt.Sprintf("Generates a short Telegram-style summary after each run.\n"+
-				"Summaries saved to: %s", platform.SummaryDir())).
+				"Summaries saved to: %s\nNote: Write tool will be automatically allowed.", platform.SummaryDir())).
 			Value(&summaryEnabled),
-	)
-
-	// Step 6: Disallowed Tools — pre-select based on existing config
-	var toolOptions []huh.Option[string]
-	for _, t := range claudeCodeTools {
-		opt := huh.NewOption(t.Label, t.Name)
-		if disabledSet[t.Name] {
-			opt = opt.Selected(true)
-		}
-		toolOptions = append(toolOptions, opt)
-	}
-	step6 := huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("🚫 Disallowed Tools").
-			Description("Selected tools will be DENIED during job execution. Deselect to allow.").
-			Options(toolOptions...).
-			Value(&disallowedTools),
 	)
 
 	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
@@ -416,14 +434,20 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		effortVal = ""
 	}
 
-	// Preserve custom tool patterns from YAML that aren't in the known tools list
+	// Summary requires Write tool — ensure it's allowed
+	if summaryEnabled {
+		allowedTools = ensureAllowed(allowedTools, "Write")
+	}
+
+	// Compute disallowed from allowed selection, preserving custom patterns from YAML
+	disallowed := computeDisallowedTools(allowedTools)
 	knownToolNames := make(map[string]bool)
 	for _, t := range claudeCodeTools {
 		knownToolNames[t.Name] = true
 	}
 	for _, t := range job.DisallowedTools {
 		if !knownToolNames[t] {
-			disallowedTools = append(disallowedTools, t)
+			disallowed = append(disallowed, t)
 		}
 	}
 
@@ -432,7 +456,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	job.Model = model
 	job.Effort = effortVal
 	job.Timeout = parseInt(timeout, 300)
-	job.DisallowedTools = nilIfEmpty(disallowedTools)
+	job.DisallowedTools = nilIfEmpty(disallowed)
 	job.SummaryEnabled = summaryEnabled
 
 	return &WizardResult{
@@ -451,6 +475,31 @@ func parseInt(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return i
+}
+
+// ensureAllowed adds a tool to the allowed list if not already present.
+func ensureAllowed(allowed []string, tool string) []string {
+	for _, t := range allowed {
+		if t == tool {
+			return allowed
+		}
+	}
+	return append(allowed, tool)
+}
+
+// computeDisallowedTools returns the known tools NOT present in the allowed list.
+func computeDisallowedTools(allowed []string) []string {
+	allowedSet := make(map[string]bool)
+	for _, t := range allowed {
+		allowedSet[t] = true
+	}
+	var disallowed []string
+	for _, t := range claudeCodeTools {
+		if !allowedSet[t.Name] {
+			disallowed = append(disallowed, t.Name)
+		}
+	}
+	return disallowed
 }
 
 // nilIfEmpty returns nil if the slice is empty, preserving omitempty behavior.

@@ -7,13 +7,25 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/dika-maulidal/opencron/internal/config"
 	"github.com/dika-maulidal/opencron/internal/platform"
 	"github.com/dika-maulidal/opencron/internal/tui"
+	"github.com/dika-maulidal/opencron/internal/ui"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+)
+
+// Package-level typed flag values for non-interactive mode.
+var (
+	flagName       = ui.NewJobNameValue("")
+	flagSchedule   = ui.NewCronValue("")
+	flagWorkingDir = ui.NewDirValue("")
+	flagModel      = ui.NewModelValue("sonnet")
+	flagEffort     = ui.NewEffortValue("")
+	flagTimeout    = ui.NewTimeoutValue(300)
 )
 
 var addCmd = &cobra.Command{
@@ -27,16 +39,39 @@ func init() {
 	rootCmd.AddCommand(addCmd)
 
 	addCmd.Flags().Bool("non-interactive", false, "non-interactive mode (all params via flags)")
-	addCmd.Flags().String("name", "", "job name (required)")
-	addCmd.Flags().String("schedule", "", "cron schedule expression (required)")
-	addCmd.Flags().String("working-dir", "", "working directory (required)")
+	addCmd.Flags().Var(flagName, "name", "job name (required)")
+	addCmd.Flags().Var(flagSchedule, "schedule", "cron schedule expression (required)")
+	addCmd.Flags().Var(flagWorkingDir, "working-dir", "working directory (required)")
 	addCmd.Flags().String("prompt-file", "", "prompt file name (default: <name>.md)")
 	addCmd.Flags().String("prompt-content", "", "prompt content (written to prompt file)")
-	addCmd.Flags().String("model", "sonnet", "Claude model: sonnet, opus, haiku")
-	addCmd.Flags().String("effort", "", "effort level: low, medium, high (default), max")
-	addCmd.Flags().Int("timeout", 300, "timeout in seconds")
+	addCmd.Flags().Var(flagModel, "model", "Claude model: sonnet, opus, haiku")
+	addCmd.Flags().Var(flagEffort, "effort", "effort level: low, medium, high (default), max")
+	addCmd.Flags().Var(flagTimeout, "timeout", "timeout in seconds")
 	addCmd.Flags().Bool("summary", false, "enable Telegram-style summary after each run")
 	addCmd.Flags().StringArray("disallowed-tools", nil, "tools to deny (repeatable, e.g. --disallowed-tools \"Bash(git:*)\" --disallowed-tools \"Edit\")")
+
+	// Shell completion for enum flags
+	modelKeys := make([]string, 0, len(ui.ValidModels))
+	for k := range ui.ValidModels {
+		modelKeys = append(modelKeys, k)
+	}
+	sort.Strings(modelKeys)
+	_ = addCmd.RegisterFlagCompletionFunc("model", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return modelKeys, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	effortKeys := make([]string, 0, len(ui.ValidEfforts))
+	for k := range ui.ValidEfforts {
+		effortKeys = append(effortKeys, k)
+	}
+	sort.Strings(effortKeys)
+	_ = addCmd.RegisterFlagCompletionFunc("effort", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return effortKeys, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	_ = addCmd.RegisterFlagCompletionFunc("working-dir", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	})
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -82,26 +117,26 @@ func runAddInteractive() error {
 }
 
 func runAddNonInteractive(cmd *cobra.Command) error {
-	name, _ := cmd.Flags().GetString("name")
-	schedule, _ := cmd.Flags().GetString("schedule")
+	name := flagName.String()
+	schedule := flagSchedule.String()
+	workingDir := flagWorkingDir.String()
+	model := flagModel.String()
+	effort := flagEffort.String()
+	timeout := flagTimeout.Int()
 	promptFile, _ := cmd.Flags().GetString("prompt-file")
 	promptContent, _ := cmd.Flags().GetString("prompt-content")
-	model, _ := cmd.Flags().GetString("model")
-	effort, _ := cmd.Flags().GetString("effort")
-	timeout, _ := cmd.Flags().GetInt("timeout")
-	workingDir, _ := cmd.Flags().GetString("working-dir")
 	summaryEnabled, _ := cmd.Flags().GetBool("summary")
 	disallowedTools, _ := cmd.Flags().GetStringArray("disallowed-tools")
 
 	// Validate required flags
 	var missing []string
-	if name == "" {
+	if !cmd.Flags().Changed("name") {
 		missing = append(missing, "--name")
 	}
-	if schedule == "" {
+	if !cmd.Flags().Changed("schedule") {
 		missing = append(missing, "--schedule")
 	}
-	if workingDir == "" {
+	if !cmd.Flags().Changed("working-dir") {
 		missing = append(missing, "--working-dir")
 	}
 	if len(missing) > 0 {
@@ -145,7 +180,7 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		Enabled:          true,
 	}
 
-	// Validate the job config (catches invalid model, effort, cron, etc.)
+	// Validate the job config (defense-in-depth)
 	if err := job.Validate(); err != nil {
 		return err
 	}

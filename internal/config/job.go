@@ -67,21 +67,14 @@ func (j *JobConfig) Validate() error {
 
 	// Validate model if specified
 	if j.Model != "" {
-		validModels := map[string]bool{
-			"sonnet": true, "opus": true, "haiku": true,
-			"claude-sonnet-4-6": true, "claude-opus-4-6": true, "claude-haiku-4-5-20251001": true,
-		}
-		if !validModels[j.Model] {
+		if !ui.ValidModels[j.Model] {
 			return fmt.Errorf("job %q: unknown model %q", j.Name, j.Model)
 		}
 	}
 
 	// Validate effort if specified
 	if j.Effort != "" {
-		validEfforts := map[string]bool{
-			"low": true, "medium": true, "high": true, "max": true,
-		}
-		if !validEfforts[j.Effort] {
+		if !ui.ValidEfforts[j.Effort] {
 			return fmt.Errorf("job %q: unknown effort %q (valid: low, medium, high, max)", j.Name, j.Effort)
 		}
 	}

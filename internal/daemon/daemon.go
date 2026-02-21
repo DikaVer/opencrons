@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/dika-maulidal/opencron/internal/chat"
@@ -34,7 +35,7 @@ type Daemon struct {
 	jobs    map[string]cron.EntryID // job name -> cron entry ID
 	mu      sync.Mutex
 	logger  *log.Logger
-	tgBot   *telegram.Bot
+	tgBot   atomic.Pointer[telegram.Bot] // written once at startup, read from cron goroutines
 }
 
 // cronLogger routes cron library messages to OpenCron logging.
@@ -88,6 +89,15 @@ func Run() error {
 		logger: stdlog,
 	}
 
+	// Start Telegram bot if configured (before loading jobs so closures see d.tgBot)
+	msgCfg := platform.GetMessengerConfig()
+	if msgCfg != nil && msgCfg.Type == "telegram" {
+		if err := d.startTelegramBot(db, msgCfg, stdlog); err != nil {
+			stdlog.Printf("Warning: Telegram bot failed to start: %v", err)
+			logger.Debug("Telegram bot start error: %v", err)
+		}
+	}
+
 	// Load and register jobs
 	if err := d.loadJobs(); err != nil {
 		return fmt.Errorf("loading jobs: %w", err)
@@ -101,15 +111,6 @@ func Run() error {
 		d.watcher = watcher
 		go watcher.Start()
 		defer watcher.Stop()
-	}
-
-	// Start Telegram bot if configured
-	msgCfg := platform.GetMessengerConfig()
-	if msgCfg != nil && msgCfg.Type == "telegram" {
-		if err := d.startTelegramBot(db, msgCfg, stdlog); err != nil {
-			stdlog.Printf("Warning: Telegram bot failed to start: %v", err)
-			logger.Debug("Telegram bot start error: %v", err)
-		}
 	}
 
 	// Start cron
@@ -126,8 +127,8 @@ func Run() error {
 	logger.Info("Received %s, shutting down...", sig)
 
 	// Stop Telegram bot first
-	if d.tgBot != nil {
-		d.tgBot.Stop()
+	if bot := d.tgBot.Load(); bot != nil {
+		bot.Stop()
 	}
 
 	ctx := d.cron.Stop()
@@ -150,7 +151,7 @@ func (d *Daemon) startTelegramBot(db *storage.DB, msgCfg *platform.MessengerSett
 	runner := chat.NewRunner()
 	tgBot.SetChatComponents(sessionMgr, runner)
 
-	d.tgBot = tgBot
+	d.tgBot.Store(tgBot)
 
 	// Start bot in background goroutine
 	go tgBot.Start(context.Background())
@@ -193,9 +194,7 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 		delete(d.jobs, job.Name)
 	}
 
-	// Capture job for closure
 	j := job
-	tgBot := d.tgBot
 
 	entryID, err := d.cron.AddFunc(j.Schedule, func() {
 		d.logger.Printf("Executing job %q", j.Name)
@@ -211,8 +210,8 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
 
 		// Notify via Telegram if bot is running
-		if tgBot != nil {
-			tgBot.NotifyJobComplete(ctx, j.Name, result.Status, result.SummaryPath)
+		if bot := d.tgBot.Load(); bot != nil {
+			bot.NotifyJobComplete(ctx, j.Name, result.Status, result.SummaryPath)
 		}
 	})
 	if err != nil {

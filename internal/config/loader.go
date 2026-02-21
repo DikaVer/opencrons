@@ -115,8 +115,20 @@ func SavePromptFile(promptsDir, filename, content string) error {
 	return nil
 }
 
+// validateJobName rejects names that could escape the target directory via path traversal.
+func validateJobName(name string) error {
+	if name == "" || strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
+		return fmt.Errorf("invalid job name %q", name)
+	}
+	return nil
+}
+
 // DeleteJob removes a job's YAML config and optionally its prompt file.
 func DeleteJob(schedulesDir, promptsDir, jobName string, deletePrompt bool) error {
+	if err := validateJobName(jobName); err != nil {
+		return err
+	}
+
 	// Load the job first to get the actual prompt file name
 	var promptFile string
 	if deletePrompt {
@@ -150,6 +162,9 @@ func DeleteJob(schedulesDir, promptsDir, jobName string, deletePrompt bool) erro
 
 // JobNameExists checks if a job with the given name already exists.
 func JobNameExists(schedulesDir, name string) bool {
+	if validateJobName(name) != nil {
+		return false
+	}
 	path := filepath.Join(schedulesDir, name+".yml")
 	if _, err := os.Stat(path); err == nil {
 		return true
@@ -163,6 +178,10 @@ func JobNameExists(schedulesDir, name string) bool {
 
 // FindJobByName loads a specific job config by name.
 func FindJobByName(schedulesDir, name string) (*JobConfig, error) {
+	if err := validateJobName(name); err != nil {
+		return nil, err
+	}
+
 	path := filepath.Join(schedulesDir, name+".yml")
 	if _, err := os.Stat(path); err == nil {
 		return LoadJob(path)

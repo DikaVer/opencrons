@@ -10,7 +10,11 @@ go build -o build/opencron ./cmd/opencron/
 go test ./...
 go build ./...          # compile check all packages
 make build              # build with version ldflags
+make build-all          # cross-compile linux + windows
 make lint               # golangci-lint
+make clean              # remove build artifacts
+make tidy               # go mod tidy
+make install-skill      # install Claude skill to ~/.claude/skills/
 
 # Install globally (build + install in one step)
 go install github.com/DikaVer/opencron/cmd/opencron@latest  # any platform
@@ -18,14 +22,17 @@ sudo make install                   # Linux/macOS → /usr/local/bin/
 go install ./cmd/opencron/          # Windows → %GOPATH%\bin\
 make uninstall                      # Remove from install path
 
+# Global flags
+opencron --verbose/-v   # verbose output (applies to any subcommand)
+
 # CLI subcommands
 opencron                # interactive TUI menu
 opencron setup          # run (or re-run) the setup wizard
 opencron settings       # manage provider, messenger, chat, debug settings
-opencron add            # create a new job (wizard or flags)
+opencron add            # create a new job (interactive wizard)
 opencron list           # list all jobs
 opencron run <name>     # execute a job immediately
-opencron edit <name>    # edit job config
+opencron edit <name>    # edit job config (interactive wizard)
 opencron enable <name>  # enable a job
 opencron disable <name> # disable a job
 opencron remove <name>  # delete job + prompt file
@@ -35,6 +42,25 @@ opencron stop           # stop running daemon
 opencron status         # check daemon status
 opencron validate       # validate all job configs
 opencron debug [on|off] # toggle debug logging
+
+# Non-interactive job creation (all required flags must be set)
+opencron add --non-interactive \
+  --name "job-name" \
+  --schedule "0 2 * * *" \
+  --working-dir "/path/to/project" \
+  --prompt-file "job-name.md" \          # optional, defaults to <name>.md
+  --prompt-content "Do something..." \   # optional, writes to prompt file
+  --model sonnet \                       # optional: sonnet|opus|haiku
+  --effort medium \                      # optional: low|medium|high|max
+  --timeout 300 \                        # optional, seconds (default 300)
+  --summary \                            # optional, enable summary
+  --disallowed-tools "Bash(git:*)"       # optional, repeatable
+
+# Flags on other commands
+opencron logs [name] -n 50              # --limit/-n: number of entries (default 20)
+opencron remove <name> -f               # --force/-f: skip confirmation
+opencron remove <name> --keep-prompt    # delete config only, keep prompt file
+opencron start --install                # install as OS service
 ```
 
 ## Architecture
@@ -52,6 +78,7 @@ cmd/opencron/main.go
        ├→ internal/platform/     Cross-platform paths, PID management, process detection, settings
        ├→ internal/logger/       Debug logger (singleton, gated by platform.IsDebugEnabled())
        ├→ internal/provider/     AI provider interface + Anthropic implementation
+       ├→ internal/ui/           Shared styles (Catppuccin Mocha), cron formatting, validators
        ├→ internal/messenger/    Messenger interface
        │    └→ telegram/         Telegram bot: handlers, chat, pairing, inline keyboards
        └→ internal/chat/         Chat session manager + Claude runner (--session-id)
@@ -129,7 +156,7 @@ Settings {
   ├── prompts/            # One .md per job (prompt content)
   ├── logs/               # stdout (.json) / stderr (.log) per execution
   ├── summary/            # Execution summaries (when summary_enabled)
-  ├── workspace/          # CLAUDE.md + .claude/ (copied from .workspace/ during setup)
+  ├── workspace/          # AGENTS.md (copied from .workspace/ during setup)
   ├── data/opencron.db    # SQLite (WAL mode)
   ├── settings.json       # All settings (debug, provider, messenger, chat, daemon)
   └── opencron.pid        # Daemon lock file

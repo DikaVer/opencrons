@@ -167,6 +167,7 @@ Based on the task, recommend settings:
 | **Effort** | `medium` for routine jobs (saves tokens). `high` for complex reasoning. `low` for trivial checks. `max` for critical Opus tasks only. |
 | **Timeout** | 60-120s for quick checks. 300s (default) for standard tasks. 600-900s for complex multi-file work. |
 | **Summary** | Enable for jobs where you want a human-readable execution digest. |
+| **Disallowed tools** | Restrict specific tools for safety. E.g., `Bash(git:*)` blocks git commands, `Edit` blocks file edits. Use for read-only jobs. |
 
 Present the config as a summary table and confirm with the user.
 
@@ -212,7 +213,8 @@ opencron add --non-interactive \
   --model sonnet \
   --effort medium \
   --timeout 300 \
-  --summary
+  --summary \
+  --disallowed-tools "Bash(git:*)"
 ```
 
 ---
@@ -309,18 +311,22 @@ Respond with JSON:
 | `--effort` | (empty = high) | Effort level: `low`, `medium`, `high`, `max` |
 | `--timeout` | `300` | Wall-clock timeout in seconds |
 | `--summary` | `false` | Enable execution summary |
+| `--disallowed-tools` | — | Tools to deny (repeatable: `--disallowed-tools "Bash(git:*)" --disallowed-tools "Edit"`) |
 
 ### Cron schedule reference
 
 | Expression | Meaning |
 |-----------|---------|
+| `* * * * *` | Every minute |
+| `*/5 * * * *` | Every 5 minutes |
+| `*/30 * * * *` | Every 30 minutes |
 | `0 * * * *` | Every hour |
 | `0 */6 * * *` | Every 6 hours |
 | `0 2 * * *` | Daily at 2 AM |
 | `0 9 * * *` | Daily at 9 AM |
 | `0 9 * * 1` | Weekly, Monday 9 AM |
 | `0 9 * * 1-5` | Weekdays at 9 AM |
-| `*/30 * * * *` | Every 30 minutes |
+| `0 0 1 * *` | Monthly, 1st at midnight |
 | `0 9,17 * * *` | At 9 AM and 5 PM |
 
 ### Timeout guide
@@ -346,6 +352,7 @@ Respond with JSON:
 | `timeout` | `--timeout` | `context.WithTimeout` | Kills process on exceed |
 | `no_session_persistence` | — (always true) | `--no-session-persistence` | Hardcoded |
 | `summary_enabled` | `--summary` | Prompt injection | Appends summary directive |
+| `disallowed_tools` | `--disallowed-tools` | `--disallowed-tools` | Repeatable, restricts tool access |
 | — | — | `--permission-mode bypassPermissions` | Always hardcoded |
 | — | — | `--output-format json` | Always hardcoded |
 
@@ -373,10 +380,13 @@ Shows all jobs with name, schedule, model, effort, and enabled/disabled status.
 Execute immediately (bypass schedule). Shows status, duration, exit code, cost, and token breakdown.
 
 ### Remove: `opencron remove <name>`
-Deletes the job config YAML and its prompt file. Use `-f` to skip confirmation.
+Deletes the job config YAML and its prompt file.
+- `-f` / `--force`: skip confirmation prompt
+- `--keep-prompt`: delete config only, keep the prompt `.md` file
 
 ### Logs: `opencron logs [name]`
 View execution history. Shows job name, start time, status, trigger type, cost, and token I/O.
+- `-n` / `--limit`: number of entries to show (default 20). Example: `opencron logs my-job -n 50`
 
 ### Status: `opencron status`
 Shows daemon running/stopped status and next scheduled run time for each enabled job.
@@ -406,7 +416,7 @@ opencron status             # Check daemon + next runs
 | `logs/` | stdout (.json) and stderr (.log) per execution |
 | `summary/` | Execution summaries (when enabled) |
 | `data/opencron.db` | SQLite execution log + token usage |
-| `settings.json` | Debug settings |
+| `settings.json` | All settings (provider, messenger, chat, daemon, debug) |
 | `opencron.pid` | Daemon PID lock file |
 
 **Linux/macOS:** `~/.opencron/` (or `$XDG_CONFIG_HOME/opencron/`)

@@ -81,7 +81,7 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 	// Append summary injection if enabled
 	if job.SummaryEnabled {
 		now := time.Now()
-		summaryPath = filepath.Join(platform.SummaryDir(), fmt.Sprintf("%s-%s.md", job.Name, now.Format("2006-01-02")))
+		summaryPath = filepath.Join(platform.SummaryDir(), fmt.Sprintf("%s-%s.md", job.Name, now.Format("20060102-150405")))
 		injection := strings.NewReplacer(
 			"{{SUMMARY_PATH}}", summaryPath,
 			"{{JOB_NAME}}", job.Name,
