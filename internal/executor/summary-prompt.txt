@@ -5,8 +5,6 @@ IMPORTANT: After completing the main task above, you MUST generate an execution 
 
 Write a concise summary of what was accomplished. Use Telegram-style markdown formatting with emoji.
 
-Save the summary using the Write tool to: {{SUMMARY_PATH}}
-
 Format:
 **{{JOB_NAME}}** | {{DATE}}
 
