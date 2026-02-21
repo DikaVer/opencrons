@@ -82,10 +82,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Send output to Telegram if summary is enabled and output is available
 	if job.SummaryEnabled && result.Output != "" {
-		if msgCfg := platform.GetMessengerConfig(); msgCfg != nil && msgCfg.Type == "telegram" {
+		msgCfg := platform.GetMessengerConfig()
+		if msgCfg != nil && msgCfg.Type == "telegram" {
 			tgBot, err := telegram.New(db, msgCfg, log.New(os.Stderr, "", 0))
-			if err == nil {
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Telegram notification failed: %v\n", err)
+			} else {
 				tgBot.NotifyJobComplete(ctx, job.Name, result.Status, result.Output)
+				fmt.Println("Summary sent to Telegram.")
 			}
 		}
 	}

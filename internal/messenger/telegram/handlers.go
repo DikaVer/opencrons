@@ -327,6 +327,8 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		return
 	}
 
+	logger.Debug("runJob: %q finished status=%s output=%d bytes", jobName, result.Status, len(result.Output))
+
 	// Send job output if available, otherwise fall back to generic status
 	if output := strings.TrimSpace(result.Output); output != "" {
 		msg := output
@@ -335,7 +337,9 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 		}
 		msg = truncateForTelegram(msg, jobName)
 		if sendErr := b.Send(execCtx, chatID, msg); sendErr != nil {
+			logger.Debug("runJob: HTML send failed for %q: %v", jobName, sendErr)
 			if plainErr := b.SendPlain(execCtx, chatID, msg); plainErr != nil {
+				logger.Debug("runJob: plain send also failed for %q: %v", jobName, plainErr)
 				b.SendPlain(execCtx, chatID, fmt.Sprintf("Job %q completed (%s) but failed to deliver output. Check logs: opencrons logs %s", jobName, result.Status, jobName))
 			}
 		}
