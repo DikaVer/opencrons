@@ -13,7 +13,7 @@ func openTestDB(t *testing.T) *DB {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 
@@ -26,11 +26,13 @@ func TestOpen_CreatesSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var name string
-		rows.Scan(&name)
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
 		if _, ok := tables[name]; ok {
 			tables[name] = true
 		}
@@ -94,8 +96,13 @@ func TestGetRecentLogs(t *testing.T) {
 			Status:      "running",
 			TriggerType: "scheduled",
 		}
-		id, _ := db.InsertLog(entry)
-		db.UpdateLog(id, time.Now(), 0, "", "", 0, 0, 0, 0, 0, "success", "")
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0, 0, 0, 0, 0, "success", ""); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	logs, err := db.GetRecentLogs(2)
@@ -116,8 +123,13 @@ func TestGetUsageByJobName(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		entry := &ExecutionLog{JobID: "j1", JobName: "usage-test", StartedAt: time.Now(), Status: "running", TriggerType: "scheduled"}
-		id, _ := db.InsertLog(entry)
-		db.UpdateLog(id, time.Now(), 0, "", "", 0.10, 100, 50, 0, 0, "success", "")
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0.10, 100, 50, 0, 0, "success", ""); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	usage, err := db.GetUsageByJobName("usage-test")
@@ -137,8 +149,13 @@ func TestGetTotalUsage(t *testing.T) {
 
 	for _, name := range []string{"a", "b"} {
 		entry := &ExecutionLog{JobID: name, JobName: name, StartedAt: time.Now(), Status: "running", TriggerType: "scheduled"}
-		id, _ := db.InsertLog(entry)
-		db.UpdateLog(id, time.Now(), 0, "", "", 0.05, 50, 25, 0, 0, "success", "")
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0.05, 50, 25, 0, 0, "success", ""); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	usage, err := db.GetTotalUsage()
@@ -190,7 +207,9 @@ func TestDeactivateUserSessions(t *testing.T) {
 
 	now := time.Now()
 	session := &ChatSession{ID: "sess-2", UserID: 999, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: now, UpdatedAt: now}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := db.DeactivateUserSessions(999); err != nil {
 		t.Fatalf("DeactivateUserSessions: %v", err)
@@ -210,7 +229,9 @@ func TestTouchSession(t *testing.T) {
 
 	old := time.Now().Add(-time.Hour)
 	session := &ChatSession{ID: "sess-3", UserID: 111, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: old, UpdatedAt: old}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(10 * time.Millisecond)
 	if err := db.TouchSession("sess-3"); err != nil {
@@ -231,7 +252,9 @@ func TestUpdateSessionModel(t *testing.T) {
 
 	now := time.Now()
 	session := &ChatSession{ID: "sess-4", UserID: 222, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: now, UpdatedAt: now}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := db.UpdateSessionModel("sess-4", "opus"); err != nil {
 		t.Fatalf("UpdateSessionModel: %v", err)
@@ -248,7 +271,9 @@ func TestUpdateSessionEffort(t *testing.T) {
 
 	now := time.Now()
 	session := &ChatSession{ID: "sess-5", UserID: 333, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: now, UpdatedAt: now}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := db.UpdateSessionEffort("sess-5", "max"); err != nil {
 		t.Fatalf("UpdateSessionEffort: %v", err)
@@ -265,10 +290,16 @@ func TestAddChatLog_GetChatLogs(t *testing.T) {
 
 	now := time.Now()
 	session := &ChatSession{ID: "chat-sess", UserID: 444, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: now, UpdatedAt: now}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
-	db.AddChatLog("chat-sess", "user", "hello", 0, 0)
-	db.AddChatLog("chat-sess", "assistant", "hi there", 0.01, 100)
+	if err := db.AddChatLog("chat-sess", "user", "hello", 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AddChatLog("chat-sess", "assistant", "hi there", 0.01, 100); err != nil {
+		t.Fatal(err)
+	}
 
 	msgs, err := db.GetChatLogs("chat-sess", 10)
 	if err != nil {
@@ -284,7 +315,9 @@ func TestDeactivateStaleSessions(t *testing.T) {
 
 	old := time.Now().Add(-2 * time.Hour)
 	session := &ChatSession{ID: "stale-sess", UserID: 555, ChatID: 1, Model: "sonnet", Effort: "high", WorkingDir: "/tmp", Active: true, CreatedAt: old, UpdatedAt: old}
-	db.CreateSession(session)
+	if err := db.CreateSession(session); err != nil {
+		t.Fatal(err)
+	}
 
 	n, err := db.DeactivateStaleSessions(1 * time.Hour)
 	if err != nil {

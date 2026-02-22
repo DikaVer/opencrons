@@ -28,7 +28,7 @@ func (s *opencronsService) Start(_ service.Service) error {
 func (s *opencronsService) Stop(_ service.Service) error {
 	// Daemon handles shutdown via signal
 	p, _ := os.FindProcess(os.Getpid())
-	p.Signal(os.Interrupt)
+	_ = p.Signal(os.Interrupt)
 	return nil
 }
 

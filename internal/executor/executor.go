@@ -98,7 +98,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	stderrFile, err := os.Create(stderrPath)
 	if err != nil {
-		stdoutFile.Close()
+		_ = stdoutFile.Close()
 		return nil, fmt.Errorf("creating stderr file: %w", err)
 	}
 
@@ -133,8 +133,8 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	duration := time.Since(startTime)
 
 	// Close output files before reading them back
-	stdoutFile.Close()
-	stderrFile.Close()
+	_ = stdoutFile.Close()
+	_ = stderrFile.Close()
 
 	// Determine result
 	result := &Result{
@@ -195,7 +195,7 @@ func parseUsage(stdoutPath string, result *Result) {
 		log.Debug("parseUsage: cannot open file", "path", stdoutPath, "err", err)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var output claudeOutput
 	parsed := false

@@ -19,7 +19,7 @@ func setupSessionTest(t *testing.T) (*SessionManager, *storage.DB) {
 	if err != nil {
 		t.Fatalf("storage.Open: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
 	return NewSessionManager(db), db
 }
@@ -61,7 +61,7 @@ func TestGetOrCreateSession_Existing(t *testing.T) {
 func TestClearSession(t *testing.T) {
 	sm, db := setupSessionTest(t)
 
-	sm.GetOrCreateSession(100, 200)
+	_, _, _ = sm.GetOrCreateSession(100, 200)
 
 	if err := sm.ClearSession(100); err != nil {
 		t.Fatalf("ClearSession: %v", err)

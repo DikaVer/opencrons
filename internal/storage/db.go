@@ -170,7 +170,7 @@ func (db *DB) GetLogsByJobName(jobName string, limit int) ([]ExecutionLog, error
 	if err != nil {
 		return nil, fmt.Errorf("querying logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanLogs(rows)
 }
@@ -194,7 +194,7 @@ func (db *DB) GetRecentLogs(limit int) ([]ExecutionLog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanLogs(rows)
 }
@@ -358,7 +358,7 @@ func (db *DB) GetChatLogs(sessionID string, limit int) ([]ChatMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying chat logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var messages []ChatMessage
 	for rows.Next() {

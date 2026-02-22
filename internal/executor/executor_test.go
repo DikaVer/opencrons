@@ -20,11 +20,17 @@ func setupTestEnv(t *testing.T) string {
 
 	// Create prompts directory and a test prompt
 	promptsDir := filepath.Join(dir, "prompts")
-	os.MkdirAll(promptsDir, 0755)
-	os.WriteFile(filepath.Join(promptsDir, "test.md"), []byte("Do something."), 0644)
+	if err := os.MkdirAll(promptsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(promptsDir, "test.md"), []byte("Do something."), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create summary directory
-	os.MkdirAll(filepath.Join(dir, "summary"), 0755)
+	if err := os.MkdirAll(filepath.Join(dir, "summary"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	return dir
 }
@@ -180,7 +186,9 @@ func TestBuildCommand_PromptContent(t *testing.T) {
 	setupTestEnv(t)
 
 	promptContent := "Run the tests and report results."
-	os.WriteFile(filepath.Join(platform.PromptsDir(), "content-test.md"), []byte(promptContent), 0644)
+	if err := os.WriteFile(filepath.Join(platform.PromptsDir(), "content-test.md"), []byte(promptContent), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	job := &config.JobConfig{
 		Name:       "test",
@@ -210,8 +218,13 @@ func TestParseUsage_SingleJSON(t *testing.T) {
 	output.Usage.InputTokens = 1000
 	output.Usage.OutputTokens = 500
 
-	data, _ := json.Marshal(output)
-	os.WriteFile(path, data, 0644)
+	data, err := json.Marshal(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	result := &Result{}
 	parseUsage(path, result)
@@ -236,7 +249,9 @@ func TestParseUsage_NDJSON(t *testing.T) {
 		`{"type":"progress","result":"","total_cost_usd":0.01}`,
 		`{"type":"result","result":"final answer","total_cost_usd":0.05,"usage":{"input_tokens":2000,"output_tokens":800}}`,
 	}
-	os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	result := &Result{}
 	parseUsage(path, result)
@@ -252,7 +267,9 @@ func TestParseUsage_NDJSON(t *testing.T) {
 func TestParseUsage_EmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "stdout.json")
-	os.WriteFile(path, []byte(""), 0644)
+	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	result := &Result{}
 	parseUsage(path, result) // should not panic
@@ -265,7 +282,9 @@ func TestParseUsage_EmptyFile(t *testing.T) {
 func TestParseUsage_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "stdout.json")
-	os.WriteFile(path, []byte("this is not json"), 0644)
+	if err := os.WriteFile(path, []byte("this is not json"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	result := &Result{}
 	parseUsage(path, result) // should not panic

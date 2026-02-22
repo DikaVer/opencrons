@@ -28,7 +28,7 @@ func NewWatcher(dir string, d *Daemon) (*Watcher, error) {
 	}
 
 	if err := fsW.Add(dir); err != nil {
-		fsW.Close()
+		_ = fsW.Close()
 		return nil, err
 	}
 

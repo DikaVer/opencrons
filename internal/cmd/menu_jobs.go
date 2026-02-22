@@ -141,7 +141,7 @@ func runJobByName(name string) {
 		fmt.Fprintf(os.Stderr, "  Error opening database: %v\n", err)
 		return
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()

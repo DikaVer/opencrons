@@ -291,14 +291,20 @@ func TestLoadAllJobs(t *testing.T) {
 	// Write two valid configs
 	for _, name := range []string{"job-a", "job-b"} {
 		content := "id: x\nname: " + name + "\nschedule: \"* * * * *\"\nworking_dir: .\nprompt_file: " + name + ".md\nenabled: true\n"
-		os.WriteFile(filepath.Join(dir, name+".yml"), []byte(content), 0644)
+		if err := os.WriteFile(filepath.Join(dir, name+".yml"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Write one malformed config
-	os.WriteFile(filepath.Join(dir, "bad.yml"), []byte("not: [valid: yaml"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "bad.yml"), []byte("not: [valid: yaml"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Write a non-YAML file (should be skipped)
-	os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("ignore"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("ignore"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	jobs, err := LoadAllJobs(dir)
 	if err != nil {
@@ -316,8 +322,12 @@ func TestDeleteJob(t *testing.T) {
 
 	// Create a job
 	job := &JobConfig{Name: "delme", Schedule: "* * * * *", WorkingDir: ".", PromptFile: "delme.md", Enabled: true}
-	SaveJob(schedDir, job)
-	SavePromptFile(promptDir, "delme.md", "test prompt")
+	if err := SaveJob(schedDir, job); err != nil {
+		t.Fatal(err)
+	}
+	if err := SavePromptFile(promptDir, "delme.md", "test prompt"); err != nil {
+		t.Fatal(err)
+	}
 
 	// Delete it
 	if err := DeleteJob(schedDir, promptDir, "delme", true); err != nil {
@@ -342,7 +352,9 @@ func TestJobNameExists(t *testing.T) {
 		t.Error("JobNameExists returned true for nonexistent job")
 	}
 
-	os.WriteFile(filepath.Join(dir, "exists.yml"), []byte("name: exists"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "exists.yml"), []byte("name: exists"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	if !JobNameExists(dir, "exists") {
 		t.Error("JobNameExists returned false for existing job")
 	}
@@ -352,7 +364,9 @@ func TestFindJobByName(t *testing.T) {
 	dir := t.TempDir()
 
 	content := "id: x\nname: findme\nschedule: \"* * * * *\"\nworking_dir: .\nprompt_file: findme.md\n"
-	os.WriteFile(filepath.Join(dir, "findme.yml"), []byte(content), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "findme.yml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	job, err := FindJobByName(dir, "findme")
 	if err != nil {

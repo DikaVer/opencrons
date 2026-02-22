@@ -73,14 +73,14 @@ func Run() error {
 	if err := platform.WritePID(); err != nil {
 		return fmt.Errorf("writing PID file: %w", err)
 	}
-	defer platform.RemovePID()
+	defer func() { _ = platform.RemovePID() }()
 
 	// Open database
 	db, err := storage.Open(platform.DBPath())
 	if err != nil {
 		return fmt.Errorf("opening database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	d := &Daemon{
 		cron: cron.New(

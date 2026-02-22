@@ -192,8 +192,8 @@ func TestDirValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.Close()
+	defer func() { _ = os.Remove(f.Name()) }()
+	_ = f.Close()
 
 	v := NewDirValue("")
 	if err := v.Set(f.Name()); err == nil {

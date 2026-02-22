@@ -29,7 +29,7 @@ func handleViewLogs() {
 		fmt.Fprintf(os.Stderr, "  Error opening database: %v\n", err)
 		return
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	var logs []storage.ExecutionLog
 	if choice == "__all__" {
@@ -118,7 +118,7 @@ func showJobUsage(jobName string) {
 		fmt.Fprintf(os.Stderr, "  Error opening database: %v\n", err)
 		return
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	logs, err := db.GetLogsByJobName(jobName, 20)
 	if err != nil {

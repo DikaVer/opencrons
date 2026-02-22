@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	Close()
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 	os.Exit(code)
 }
 
