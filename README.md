@@ -10,7 +10,6 @@
   </p>
 
   <a href="https://github.com/DikaVer/opencrons/actions"><img src="https://img.shields.io/github/actions/workflow/status/DikaVer/opencrons/ci.yml?style=flat-square&label=build" alt="Build"></a>
-  <!-- <a href="https://github.com/DikaVer/opencrons/releases"><img src="https://img.shields.io/github/v/release/DikaVer/opencrons?style=flat-square&color=a6e3a1&include_prereleases&label=release" alt="Release"></a> -->
       <a href="https://github.com/DikaVer/opencrons/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DikaVer/opencrons?style=flat-square&color=cba6f7" alt="License"></a>
         <a href="https://github.com/DikaVer/opencrons"><img src="https://img.shields.io/github/go-mod/go-version/DikaVer/opencrons?style=flat-square&color=89b4fa" alt="Go Version"></a>
           <a href="https://github.com/DikaVer/opencrons/stargazers"><img src="https://img.shields.io/github/stars/DikaVer/opencrons?style=flat-square&color=f9e2af" alt="Stars"></a>
