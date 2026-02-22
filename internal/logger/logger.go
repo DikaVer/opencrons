@@ -64,7 +64,7 @@ func SetDebug(enabled bool) {
 // Close flushes and closes the log file. Safe to call if Init was never called.
 func Close() {
 	if logFile != nil {
-		logFile.Close()
+		_ = logFile.Close()
 	}
 }
 

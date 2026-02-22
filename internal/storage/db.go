@@ -31,7 +31,7 @@ func Open(path string) (*DB, error) {
 
 	db := &DB{conn: conn}
 	if err := db.migrate(); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("migrating database: %w", err)
 	}
 
@@ -80,7 +80,7 @@ func (db *DB) migrate() error {
 	}
 	for _, m := range migrations {
 		// Ignore "duplicate column" errors — column already exists
-		db.conn.Exec(m)
+		_, _ = db.conn.Exec(m)
 	}
 
 	// Chat sessions and messages tables

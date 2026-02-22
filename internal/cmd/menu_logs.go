@@ -54,7 +54,7 @@ func handleViewLogs() {
 
 // printLogsTable renders a styled table of execution logs.
 func printLogsTable(logs []storage.ExecutionLog) {
-	fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s  %s\n",
+	_, _ = fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s  %s\n",
 		ui.Title.Width(20).Render("JOB"),
 		ui.Title.Width(20).Render("STARTED"),
 		ui.Title.Width(10).Render("STATUS"),
@@ -93,7 +93,7 @@ func printLogsTable(logs []storage.ExecutionLog) {
 
 		startedStr := log.StartedAt.Format("2006-01-02 15:04:05")
 
-		fmt.Fprintf(os.Stdout, "  %-20s  %-20s  %s  %-8s  %-10s  %s\n",
+		_, _ = fmt.Fprintf(os.Stdout, "  %-20s  %-20s  %s  %-8s  %-10s  %s\n",
 			ui.Truncate(log.JobName, 20),
 			startedStr,
 			statusStr,
@@ -104,7 +104,7 @@ func printLogsTable(logs []storage.ExecutionLog) {
 
 		if log.ErrorMsg != "" {
 			errLines := strings.Split(log.ErrorMsg, "\n")
-			fmt.Fprintf(os.Stdout, "  %s %s\n", ui.Dim.Render("Error:"), ui.Truncate(errLines[0], 70))
+			_, _ = fmt.Fprintf(os.Stdout, "  %s %s\n", ui.Dim.Render("Error:"), ui.Truncate(errLines[0], 70))
 		}
 	}
 
@@ -136,7 +136,7 @@ func showJobUsage(jobName string) {
 	}
 
 	// Per-run table
-	fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s  %s  %s\n",
+	_, _ = fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s  %s  %s\n",
 		ui.Title.Width(20).Render("DATE"),
 		ui.Title.Width(8).Render("STATUS"),
 		ui.Title.Width(10).Render("INPUT"),
@@ -173,7 +173,7 @@ func showJobUsage(jobName string) {
 			costStr = fmt.Sprintf("$%.4f", *log.CostUSD)
 		}
 
-		fmt.Fprintf(os.Stdout, "  %-20s  %-8s  %10s  %10s  %12s  %12s  %10s\n",
+		_, _ = fmt.Fprintf(os.Stdout, "  %-20s  %-8s  %10s  %10s  %12s  %12s  %10s\n",
 			dateStr, statusStr, inputStr, outputStr, cacheReadStr, cacheWriteStr, costStr)
 	}
 
@@ -184,7 +184,7 @@ func showJobUsage(jobName string) {
 	}
 
 	fmt.Println(ui.Dim.Render("  " + strings.Repeat("-", 88)))
-	fmt.Fprintf(os.Stdout, "  %-20s  %-8s  %10s  %10s  %12s  %12s  %s\n",
+	_, _ = fmt.Fprintf(os.Stdout, "  %-20s  %-8s  %10s  %10s  %12s  %12s  %s\n",
 		ui.Accent.Render(fmt.Sprintf("TOTAL (%d runs)", usage.TotalRuns)),
 		"",
 		ui.FormatTokens(usage.TotalInputTokens),

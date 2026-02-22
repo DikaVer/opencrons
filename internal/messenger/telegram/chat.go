@@ -31,7 +31,7 @@ func (b *Bot) SetChatComponents(sm *chat.SessionManager, runner *chat.Runner) {
 // handleChatMessage processes a regular text message as a chat with Claude.
 func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	if b.sessionMgr == nil || b.chatRunner == nil {
-		b.SendPlain(ctx, update.Message.Chat.ID, "Chat is not configured. Please restart the daemon.")
+		_ = b.SendPlain(ctx, update.Message.Chat.ID, "Chat is not configured. Please restart the daemon.")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 
 	// Per-user concurrency lock
 	if !b.tryLock(userID) {
-		b.SendPlain(ctx, chatID, "Please wait, still processing your previous message...")
+		_ = b.SendPlain(ctx, chatID, "Please wait, still processing your previous message...")
 		return
 	}
 	defer b.unlock(userID)
@@ -49,7 +49,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	// Get or create session
 	session, isNew, err := b.sessionMgr.GetOrCreateSession(userID, chatID)
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error creating session: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error creating session: %v", err))
 		slogger.Warn("session error", "userID", userID, "err", err)
 		return
 	}
@@ -105,7 +105,6 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 			_ = b.sessionMgr.ClearSession(userID)
 			if newSession, sessErr := b.sessionMgr.CreateSession(userID, chatID); sessErr == nil {
 				session = newSession
-				isNew = true
 				typingCtx3, typingCancel3 := context.WithCancel(runCtx)
 				go b.sendTypingLoop(typingCtx3, tgBot, chatID)
 				result, err = b.chatRunner.Run(runCtx, newSession, text, true)
@@ -116,7 +115,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 
 	if err != nil {
 		errMsg := fmt.Sprintf("Error: %v\nTry /new for a fresh session.", err)
-		b.SendPlain(ctx, chatID, errMsg)
+		_ = b.SendPlain(ctx, chatID, errMsg)
 		slogger.Warn("chat runner error", "userID", userID, "err", err)
 		return
 	}
@@ -135,7 +134,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 	// Try markdown first, fall back to plain text if it fails
 	if err := b.Send(ctx, chatID, result.Response); err != nil {
 		// Markdown parsing may fail for certain responses, try plain text
-		b.SendPlain(ctx, chatID, result.Response)
+		_ = b.SendPlain(ctx, chatID, result.Response)
 	}
 
 	// Terminal echo
@@ -153,7 +152,7 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 // sendTypingLoop sends typing indicators every 5 seconds until context is cancelled.
 func (b *Bot) sendTypingLoop(ctx context.Context, tgBot *bot.Bot, chatID int64) {
 	// Send immediately
-	tgBot.SendChatAction(ctx, &bot.SendChatActionParams{
+	_, _ = tgBot.SendChatAction(ctx, &bot.SendChatActionParams{
 		ChatID: chatID,
 		Action: models.ChatActionTyping,
 	})
@@ -166,7 +165,7 @@ func (b *Bot) sendTypingLoop(ctx context.Context, tgBot *bot.Bot, chatID int64) 
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			tgBot.SendChatAction(ctx, &bot.SendChatActionParams{
+			_, _ = tgBot.SendChatAction(ctx, &bot.SendChatActionParams{
 				ChatID: chatID,
 				Action: models.ChatActionTyping,
 			})

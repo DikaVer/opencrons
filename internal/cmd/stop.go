@@ -47,7 +47,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 	// Wait for process to exit
 	done := make(chan struct{})
 	go func() {
-		proc.Wait()
+		_, _ = proc.Wait()
 		close(done)
 	}()
 
@@ -56,7 +56,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 		fmt.Println("Daemon stopped.")
 	case <-time.After(10 * time.Second):
 		fmt.Println("Timed out waiting — force killing...")
-		proc.Kill()
+		_ = proc.Kill()
 	}
 
 	_ = platform.RemovePID()

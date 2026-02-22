@@ -79,6 +79,6 @@ func (w *Watcher) Start() {
 func (w *Watcher) Stop() {
 	w.stopOnce.Do(func() {
 		close(w.done)
-		w.fsWatcher.Close()
+		_ = w.fsWatcher.Close()
 	})
 }

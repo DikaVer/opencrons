@@ -265,7 +265,7 @@ func RunAddWizard() (*WizardResult, error) {
 
 // RunEditWizard runs the edit wizard for an existing job.
 func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult, error) {
-	schedule := job.Schedule
+	var schedule string
 	presetKey := job.Schedule
 	prompt := existingPrompt
 	model := job.Model

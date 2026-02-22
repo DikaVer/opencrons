@@ -381,7 +381,7 @@ func RunDebugMenu(debugEnabled bool) (bool, error) {
 	fmt.Println(ui.Dim.Render("  When enabled, detailed logs are written to logs/opencrons-debug.log"))
 	fmt.Println()
 
-	action := "toggle"
+	var action string
 	if debugEnabled {
 		action = "Disable debug logging"
 	} else {
@@ -402,5 +402,5 @@ func RunDebugMenu(debugEnabled bool) (bool, error) {
 // PrintPressEnter prints a "press Enter to continue" prompt and waits.
 func PrintPressEnter() {
 	fmt.Print(ui.Dim.Render("\n  ⏎ Press Enter to continue..."))
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 }

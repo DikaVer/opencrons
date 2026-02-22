@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 func readLog(t *testing.T) string {
 	t.Helper()
 	if logFile != nil {
-		logFile.Sync()
+		_ = logFile.Sync()
 	}
 	data, err := os.ReadFile(testLogPath)
 	if err != nil {

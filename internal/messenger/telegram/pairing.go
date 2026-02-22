@@ -64,7 +64,7 @@ func StartPairingBot(token string) (*PairingBot, error) {
 		}
 		pb.mu.Unlock()
 
-		b.SendMessage(ctx, &bot.SendMessageParams{
+		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: chatID,
 			Text:   fmt.Sprintf("Your pairing code: %s\n\nEnter this code in the CLI to complete pairing.", code),
 		})

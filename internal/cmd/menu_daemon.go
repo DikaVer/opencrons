@@ -61,7 +61,7 @@ func handleDaemonMenu() {
 		}
 		tui.PrintPressEnter()
 	case "stop":
-		runStop(nil, nil)
+		_ = runStop(nil, nil)
 	case "install":
 		if err := daemon.InstallService(); err != nil {
 			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)

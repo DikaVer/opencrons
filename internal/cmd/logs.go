@@ -50,7 +50,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(logs) == 0 {
-		fmt.Fprintln(os.Stdout, "[]")
+		_, _ = fmt.Fprintln(os.Stdout, "[]")
 		return nil
 	}
 

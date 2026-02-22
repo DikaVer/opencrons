@@ -27,7 +27,7 @@ func (b *Bot) handleStopQuery(ctx context.Context, tgBot *bot.Bot, update *model
 
 	cancelVal, ok := b.cancels.Load(userID)
 	if !ok {
-		b.SendPlain(ctx, chatID, "No active query to stop.")
+		_ = b.SendPlain(ctx, chatID, "No active query to stop.")
 		return
 	}
 
@@ -49,7 +49,7 @@ func (b *Bot) handleNew(ctx context.Context, tgBot *bot.Bot, update *models.Upda
 		slogger.Warn("error deactivating sessions", "userID", userID, "err", err)
 	}
 
-	b.SendPlain(ctx, chatID, "Session cleared. Send a message to start a fresh conversation with Claude.")
+	_ = b.SendPlain(ctx, chatID, "Session cleared. Send a message to start a fresh conversation with Claude.")
 	b.stdlog.Printf("[telegram] User %d started new session", userID)
 }
 
@@ -58,12 +58,12 @@ func (b *Bot) handleJobs(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 
 	jobs, err := config.LoadAllJobs(platform.SchedulesDir())
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error loading jobs: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error loading jobs: %v", err))
 		return
 	}
 
 	if len(jobs) == 0 {
-		b.SendPlain(ctx, chatID, "No jobs configured. Use the TUI to add jobs.")
+		_ = b.SendPlain(ctx, chatID, "No jobs configured. Use the TUI to add jobs.")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (b *Bot) handleJobs(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 
 	kb := &models.InlineKeyboardMarkup{InlineKeyboard: rows}
 
-	tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	_, _ = tgBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        "Scheduled Jobs:\n(+ enabled, - disabled)",
 		ReplyMarkup: kb,
@@ -109,7 +109,7 @@ func (b *Bot) handleModel(ctx context.Context, tgBot *bot.Bot, update *models.Up
 		},
 	}
 
-	tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	_, _ = tgBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        fmt.Sprintf("Current model: *%s*\nSelect a model:", currentModel),
 		ParseMode:   models.ParseModeMarkdown,
@@ -139,7 +139,7 @@ func (b *Bot) handleEffort(ctx context.Context, tgBot *bot.Bot, update *models.U
 		},
 	}
 
-	tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	_, _ = tgBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        fmt.Sprintf("Current effort: *%s*\nSelect effort level:", currentEffort),
 		ParseMode:   models.ParseModeMarkdown,
@@ -178,7 +178,7 @@ func (b *Bot) handleStatus(ctx context.Context, tgBot *bot.Bot, update *models.U
 		statusLines = append(statusLines, "Session: none (send a message to start)")
 	}
 
-	b.SendPlain(ctx, chatID, strings.Join(statusLines, "\n"))
+	_ = b.SendPlain(ctx, chatID, strings.Join(statusLines, "\n"))
 }
 
 func (b *Bot) handleHelp(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
@@ -197,7 +197,7 @@ Commands:
 
 Send any text message to chat with Claude.`
 
-	b.SendPlain(ctx, chatID, help)
+	_ = b.SendPlain(ctx, chatID, help)
 }
 
 // handleJobCallback processes inline keyboard callbacks for job management.
@@ -205,7 +205,7 @@ func (b *Bot) handleJobCallback(ctx context.Context, tgBot *bot.Bot, update *mod
 	cb := update.CallbackQuery
 	data := cb.Data
 
-	tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+	_, _ = tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: cb.ID,
 	})
 
@@ -242,7 +242,7 @@ func (b *Bot) handleJobCallback(ctx context.Context, tgBot *bot.Bot, update *mod
 func (b *Bot) showJobActions(ctx context.Context, tgBot *bot.Bot, chatID int64, jobName string) {
 	job, err := config.FindJobByName(platform.SchedulesDir(), jobName)
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Job not found: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Job not found: %v", err))
 		return
 	}
 
@@ -272,7 +272,7 @@ func (b *Bot) showJobActions(ctx context.Context, tgBot *bot.Bot, chatID int64, 
 		},
 	}
 
-	tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	_, _ = tgBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        text,
 		ReplyMarkup: kb,
@@ -283,13 +283,13 @@ func (b *Bot) showJobActions(ctx context.Context, tgBot *bot.Bot, chatID int64, 
 func (b *Bot) toggleJob(ctx context.Context, chatID int64, jobName string, enable bool) {
 	job, err := config.FindJobByName(platform.SchedulesDir(), jobName)
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
 		return
 	}
 
 	job.Enabled = enable
 	if err := config.SaveJob(platform.SchedulesDir(), job); err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error saving job: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error saving job: %v", err))
 		return
 	}
 
@@ -297,7 +297,7 @@ func (b *Bot) toggleJob(ctx context.Context, chatID int64, jobName string, enabl
 	if !enable {
 		action = "disabled"
 	}
-	b.SendPlain(ctx, chatID, fmt.Sprintf("Job %q %s.", jobName, action))
+	_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Job %q %s.", jobName, action))
 	b.stdlog.Printf("[telegram] Job %q %s via Telegram", jobName, action)
 	slogger.Info("job toggled via telegram", "job", jobName, "action", action)
 }
@@ -306,17 +306,17 @@ func (b *Bot) toggleJob(ctx context.Context, chatID int64, jobName string, enabl
 func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 	job, err := config.FindJobByName(platform.SchedulesDir(), jobName)
 	if err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
 		return
 	}
 
 	if err := job.ValidatePromptFileExists(platform.PromptsDir()); err != nil {
-		b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
+		_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Error: %v", err))
 		return
 	}
 
 	slogger.Info("job run requested via telegram", "job", jobName)
-	b.SendPlain(ctx, chatID, fmt.Sprintf("Running job %q...", jobName))
+	_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Running job %q...", jobName))
 
 	// Use a background context for execution and result delivery — the
 	// callback handler's ctx may expire during long-running jobs.
@@ -324,7 +324,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 
 	result, err := executor.Run(execCtx, b.db, job, "manual")
 	if err != nil {
-		b.SendPlain(execCtx, chatID, fmt.Sprintf("Execution failed: %v", err))
+		_ = b.SendPlain(execCtx, chatID, fmt.Sprintf("Execution failed: %v", err))
 		return
 	}
 
@@ -336,7 +336,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 func (b *Bot) handleModelCallback(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	cb := update.CallbackQuery
 
-	tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+	_, _ = tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: cb.ID,
 	})
 
@@ -358,7 +358,7 @@ func (b *Bot) handleModelCallback(ctx context.Context, tgBot *bot.Bot, update *m
 		}
 	}
 
-	b.SendPlain(ctx, chatID, fmt.Sprintf("Model changed to: %s", model))
+	_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Model changed to: %s", model))
 	b.stdlog.Printf("[telegram] User %d changed model to %s", userID, model)
 }
 
@@ -366,7 +366,7 @@ func (b *Bot) handleModelCallback(ctx context.Context, tgBot *bot.Bot, update *m
 func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	cb := update.CallbackQuery
 
-	tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+	_, _ = tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: cb.ID,
 	})
 
@@ -386,7 +386,7 @@ func (b *Bot) handleEffortCallback(ctx context.Context, tgBot *bot.Bot, update *
 		}
 	}
 
-	b.SendPlain(ctx, chatID, fmt.Sprintf("Effort changed to: %s", effort))
+	_ = b.SendPlain(ctx, chatID, fmt.Sprintf("Effort changed to: %s", effort))
 	b.stdlog.Printf("[telegram] User %d changed effort to %s", userID, effort)
 }
 
@@ -399,7 +399,7 @@ func (b *Bot) NotifyJobComplete(ctx context.Context, jobName, status, output str
 			continue
 		}
 		var userID int64
-		fmt.Sscanf(userStr, "%d", &userID)
+		_, _ = fmt.Sscanf(userStr, "%d", &userID)
 		if userID > 0 {
 			if b.sendJobOutput(ctx, userID, jobName, status, output) {
 				sent++

@@ -78,7 +78,7 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 			handleDaemonMenu()
 
 		case tui.MenuSettings:
-			handleSettingsMenu()
+			_ = handleSettingsMenu()
 
 		case tui.MenuExit:
 			return nil

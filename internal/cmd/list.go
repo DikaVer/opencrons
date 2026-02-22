@@ -35,7 +35,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Header
-	fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s\n",
+	_, _ = fmt.Fprintf(os.Stdout, "  %s  %s  %s  %s  %s\n",
 		ui.Title.Width(20).Render("NAME"),
 		ui.Title.Width(18).Render("SCHEDULE"),
 		ui.Title.Width(10).Render("MODEL"),
@@ -56,7 +56,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			effort = "high"
 		}
 
-		fmt.Fprintf(os.Stdout, "  %-20s  %-18s  %-10s  %-10s  %s\n",
+		_, _ = fmt.Fprintf(os.Stdout, "  %-20s  %-18s  %-10s  %-10s  %s\n",
 			ui.Truncate(job.Name, 20),
 			ui.Truncate(job.Schedule, 18),
 			ui.Truncate(job.Model, 10),

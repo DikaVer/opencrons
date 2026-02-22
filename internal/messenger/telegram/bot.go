@@ -176,7 +176,7 @@ func (b *Bot) handleDefault(ctx context.Context, tgBot *bot.Bot, update *models.
 	// Authorization check
 	if !b.IsAuthorized(userID) {
 		slogger.Info("unauthorized access attempt", "userID", userID)
-		b.SendPlain(ctx, chatID, "You are not authorized to use this bot.")
+		_ = b.SendPlain(ctx, chatID, "You are not authorized to use this bot.")
 		return
 	}
 
@@ -191,7 +191,7 @@ func (b *Bot) authMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 			return
 		}
 		if !b.IsAuthorized(update.Message.From.ID) {
-			b.SendPlain(ctx, update.Message.Chat.ID, "You are not authorized to use this bot.")
+			_ = b.SendPlain(ctx, update.Message.Chat.ID, "You are not authorized to use this bot.")
 			return
 		}
 		next(ctx, tgBot, update)
@@ -205,7 +205,7 @@ func (b *Bot) authCallbackMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 			return
 		}
 		if !b.IsAuthorized(update.CallbackQuery.From.ID) {
-			tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+			_, _ = tgBot.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 				CallbackQueryID: update.CallbackQuery.ID,
 				Text:            "Not authorized",
 				ShowAlert:       true,
