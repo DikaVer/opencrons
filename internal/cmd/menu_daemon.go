@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/DikaVer/opencrons/internal/daemon"
@@ -65,6 +66,49 @@ func handleDaemonMenu() {
 	case "install":
 		if err := daemon.InstallService(); err != nil {
 			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+		}
+		tui.PrintPressEnter()
+	case "uninstall":
+		ok, err := tui.ConfirmAction(
+			"Remove from boot?",
+			"This will uninstall the system service so opencrons no longer starts automatically on boot.",
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+			tui.PrintPressEnter()
+			return
+		}
+		if !ok {
+			return
+		}
+		if err := daemon.UninstallService(); err != nil {
+			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+		}
+		tui.PrintPressEnter()
+	case "killall":
+		ok, err := tui.ConfirmAction(
+			"Kill all opencrons processes?",
+			"This will force-kill every opencrons process running on this machine and remove the PID file.",
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+			tui.PrintPressEnter()
+			return
+		}
+		if !ok {
+			return
+		}
+		killed, err := platform.KillAllDaemonProcesses()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+		} else if len(killed) == 0 {
+			fmt.Println("  No opencrons processes found.")
+		} else {
+			pids := make([]string, len(killed))
+			for i, p := range killed {
+				pids[i] = strconv.Itoa(p)
+			}
+			fmt.Printf("  Killed %d process(es): %s\n", len(killed), strings.Join(pids, ", "))
 		}
 		tui.PrintPressEnter()
 	case "logs":
