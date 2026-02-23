@@ -44,10 +44,6 @@ func (j *JobConfig) Validate() error {
 	if strings.Contains(j.PromptFile, "..") || filepath.IsAbs(j.PromptFile) {
 		return fmt.Errorf("job %q: prompt_file must be a relative path without '..'", j.Name)
 	}
-	if j.WorkingDir == "" {
-		return fmt.Errorf("job %q: working_dir is required", j.Name)
-	}
-
 	// Validate name (alphanumeric, hyphens, underscores)
 	if err := ui.ValidateJobName(j.Name); err != nil {
 		return fmt.Errorf("job name %q: %w", j.Name, err)
@@ -58,11 +54,13 @@ func (j *JobConfig) Validate() error {
 		return fmt.Errorf("job %q: invalid cron schedule %q: %w", j.Name, j.Schedule, err)
 	}
 
-	// Validate working directory exists
-	if info, err := os.Stat(j.WorkingDir); err != nil {
-		return fmt.Errorf("job %q: working_dir %q does not exist: %w", j.Name, j.WorkingDir, err)
-	} else if !info.IsDir() {
-		return fmt.Errorf("job %q: working_dir %q is not a directory", j.Name, j.WorkingDir)
+	// Validate working directory exists (only when explicitly set; empty = project folder)
+	if j.WorkingDir != "" {
+		if info, err := os.Stat(j.WorkingDir); err != nil {
+			return fmt.Errorf("job %q: working_dir %q does not exist: %w", j.Name, j.WorkingDir, err)
+		} else if !info.IsDir() {
+			return fmt.Errorf("job %q: working_dir %q is not a directory", j.Name, j.WorkingDir)
+		}
 	}
 
 	// Validate model if specified
