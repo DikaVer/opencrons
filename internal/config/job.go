@@ -26,8 +26,10 @@ type JobConfig struct {
 	Effort           string   `yaml:"effort,omitempty"`
 	DisallowedTools  []string `yaml:"disallowed_tools,omitempty"`
 	SummaryEnabled   bool     `yaml:"summary_enabled,omitempty"`
-	NoSessionPersist bool   `yaml:"no_session_persistence,omitempty"`
-	Enabled          bool   `yaml:"enabled"`
+	NoSessionPersist bool     `yaml:"no_session_persistence,omitempty"`
+	Enabled          bool     `yaml:"enabled"`
+	// OnSuccess lists job names to run automatically when this job completes successfully.
+	OnSuccess []string `yaml:"on_success,omitempty"`
 }
 
 // Validate checks that all required fields are present and valid.
@@ -82,6 +84,16 @@ func (j *JobConfig) Validate() error {
 	// Validate timeout
 	if j.Timeout < 0 {
 		return fmt.Errorf("job %q: timeout cannot be negative", j.Name)
+	}
+
+	// Validate on_success job names
+	for _, name := range j.OnSuccess {
+		if name == j.Name {
+			return fmt.Errorf("job %q: on_success cannot reference itself", j.Name)
+		}
+		if err := ui.ValidateJobName(name); err != nil {
+			return fmt.Errorf("job %q: on_success entry %q: %w", j.Name, name, err)
+		}
 	}
 
 	return nil

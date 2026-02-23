@@ -194,7 +194,29 @@ func RunAddWizard() (*WizardResult, error) {
 			Value(&summaryEnabled),
 	)
 
-	form := huh.NewForm(step1, step2, step3, step4, step5, step6, step7).
+	// Step 8 (optional): On Success — chain to other jobs
+	var onSuccess []string
+	existingJobs, _ := config.LoadAllJobs(platform.SchedulesDir())
+	var onSuccessOptions []huh.Option[string]
+	for _, j := range existingJobs {
+		if j.Enabled {
+			onSuccessOptions = append(onSuccessOptions, huh.NewOption(j.Name, j.Name))
+		}
+	}
+
+	groups := []*huh.Group{step1, step2, step3, step4, step5, step6, step7}
+	if len(onSuccessOptions) > 0 {
+		step8 := huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("🔗 On Success: Chain To Jobs").
+				Description("Jobs to run automatically when this job completes successfully.\nUseful for multi-step workflows (leave empty to skip).").
+				Options(onSuccessOptions...).
+				Value(&onSuccess),
+		)
+		groups = append(groups, step8)
+	}
+
+	form := huh.NewForm(groups...).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -255,6 +277,7 @@ func RunAddWizard() (*WizardResult, error) {
 		SummaryEnabled:   summaryEnabled,
 		NoSessionPersist: true,
 		Enabled:          true,
+		OnSuccess:        nilIfEmpty(onSuccess),
 	}
 
 	return &WizardResult{
@@ -387,7 +410,52 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Value(&summaryEnabled),
 	)
 
-	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
+	// Step 7 (optional): On Success — chain to other jobs (exclude self)
+	onSuccess := make([]string, len(job.OnSuccess))
+	copy(onSuccess, job.OnSuccess)
+	existingJobs, _ := config.LoadAllJobs(platform.SchedulesDir())
+	var onSuccessOptions []huh.Option[string]
+	currentOnSuccess := make(map[string]bool)
+	for _, n := range job.OnSuccess {
+		currentOnSuccess[n] = true
+	}
+	for _, j := range existingJobs {
+		if j.Name == job.Name || !j.Enabled {
+			continue
+		}
+		opt := huh.NewOption(j.Name, j.Name)
+		if currentOnSuccess[j.Name] {
+			opt = opt.Selected(true)
+		}
+		onSuccessOptions = append(onSuccessOptions, opt)
+	}
+
+	// keepChain is only consulted when all chain targets are unavailable (disabled/removed).
+	// true = preserve existing on_success list, false = clear it.
+	keepChain := true
+	editGroups := []*huh.Group{step1, step2, step3, step4, step5, step6}
+	if len(onSuccessOptions) > 0 {
+		step7 := huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("🔗 On Success: Chain To Jobs").
+				Description("Jobs to run automatically when this job completes successfully.\nLeave empty to disable chaining.").
+				Options(onSuccessOptions...).
+				Value(&onSuccess),
+		)
+		editGroups = append(editGroups, step7)
+	} else if len(job.OnSuccess) > 0 {
+		// All target jobs are disabled/removed; let the user decide whether to clear the chain.
+		step7 := huh.NewGroup(
+			huh.NewConfirm().
+				Title("🔗 On Success: Chain Targets Unavailable").
+				Description(fmt.Sprintf("This job chains to: %s\nNone of these jobs are currently enabled. Keep the chain configuration?",
+					strings.Join(job.OnSuccess, ", "))).
+				Value(&keepChain),
+		)
+		editGroups = append(editGroups, step7)
+	}
+
+	form := huh.NewForm(editGroups...).
 		WithTheme(theme)
 
 	if err := form.Run(); err != nil {
@@ -440,6 +508,11 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		}
 	}
 
+	// If all chain targets were unavailable and user chose not to keep them, clear the list.
+	if len(onSuccessOptions) == 0 && !keepChain {
+		onSuccess = nil
+	}
+
 	// Update job config (keep ID, Name, WorkingDir, PromptFile)
 	job.Schedule = schedule
 	job.Model = model
@@ -447,6 +520,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	job.Timeout = parseInt(timeout, 300)
 	job.DisallowedTools = nilIfEmpty(disallowed)
 	job.SummaryEnabled = summaryEnabled
+	job.OnSuccess = nilIfEmpty(onSuccess)
 
 	return &WizardResult{
 		Job:           job,
