@@ -30,6 +30,8 @@ type JobConfig struct {
 	MaxRetries       int      `yaml:"max_retries,omitempty"`   // 0 = no retries (default)
 	RetryBackoff     string   `yaml:"retry_backoff,omitempty"` // "exponential" (default) or "linear"
 	Enabled          bool     `yaml:"enabled"`
+	// OnSuccess lists job names to run automatically when this job completes successfully.
+	OnSuccess []string `yaml:"on_success,omitempty"`
 }
 
 // Validate checks that all required fields are present and valid.
@@ -91,6 +93,16 @@ func (j *JobConfig) Validate() error {
 	// "" is the canonical sentinel for "exponential" (the default); omitted from YAML for cleanliness.
 	if j.RetryBackoff != "" && j.RetryBackoff != "exponential" && j.RetryBackoff != "linear" {
 		return fmt.Errorf("job %q: retry_backoff must be \"exponential\" or \"linear\"", j.Name)
+	}
+
+	// Validate on_success job names
+	for _, name := range j.OnSuccess {
+		if name == j.Name {
+			return fmt.Errorf("job %q: on_success cannot reference itself", j.Name)
+		}
+		if err := ui.ValidateJobName(name); err != nil {
+			return fmt.Errorf("job %q: on_success entry %q: %w", j.Name, name, err)
+		}
 	}
 
 	return nil

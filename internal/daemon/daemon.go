@@ -269,6 +269,11 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 				bot.NotifyJobComplete(ctx, j.Name, result.Status, output)
 			}
 		}
+
+		// Trigger chained jobs on success
+		if result.Status == "success" && len(j.OnSuccess) > 0 {
+			d.runChainedJobs(j, map[string]bool{j.Name: true})
+		}
 	})
 	if err != nil {
 		return fmt.Errorf("adding cron entry: %w", err)
@@ -278,6 +283,65 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 	d.logger.Printf("Registered job %q (%s)", j.Name, j.Schedule)
 	slogger.Info("registered job", "name", j.Name, "schedule", j.Schedule)
 	return nil
+}
+
+// runChainedJobs launches each job listed in parent.OnSuccess in its own goroutine.
+// visited tracks job names already in the current chain to prevent infinite loops from cycles.
+// Each chained job uses a fresh context so it is independent of the parent's lifecycle.
+func (d *Daemon) runChainedJobs(parent *config.JobConfig, visited map[string]bool) {
+	for _, childName := range parent.OnSuccess {
+		if visited[childName] {
+			d.logger.Printf("Chained job %q skipped: cycle detected in chain (visited: %v)", childName, visited)
+			slogger.Warn("chain cycle detected, skipping", "child", childName, "parent", parent.Name)
+			continue
+		}
+
+		childName := childName // capture loop variable
+
+		// Copy visited set for this goroutine so sibling chains don't interfere.
+		childVisited := make(map[string]bool, len(visited)+1)
+		for k := range visited {
+			childVisited[k] = true
+		}
+		childVisited[childName] = true
+
+		go func() {
+			child, err := config.FindJobByName(platform.SchedulesDir(), childName)
+			if err != nil {
+				d.logger.Printf("Chained job %q not found (triggered by %q): %v", childName, parent.Name, err)
+				slogger.Warn("chained job not found", "child", childName, "parent", parent.Name, "err", err)
+				return
+			}
+			if !child.Enabled {
+				d.logger.Printf("Chained job %q is disabled, skipping (triggered by %q)", childName, parent.Name)
+				slogger.Info("chained job disabled, skipping", "child", childName, "parent", parent.Name)
+				return
+			}
+
+			d.logger.Printf("Running chained job %q (triggered by %q)", childName, parent.Name)
+			slogger.Info("running chained job", "child", childName, "parent", parent.Name)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			result, err := executor.Run(ctx, d.db, child, "on_success", 0)
+			if err != nil {
+				d.logger.Printf("Chained job %q execution error: %v", childName, err)
+				slogger.Error("chained job execution error", "child", childName, "err", err)
+				return
+			}
+			d.logger.Printf("Chained job %q finished: status=%s duration=%s", childName, result.Status, result.Duration)
+			slogger.Info("chained job completed", "child", childName, "status", result.Status, "duration", result.Duration)
+
+			if bot := d.tgBot.Load(); bot != nil {
+				bot.NotifyJobComplete(ctx, childName, result.Status, result.Output)
+			}
+
+			if result.Status == "success" && len(child.OnSuccess) > 0 {
+				d.runChainedJobs(child, childVisited)
+			}
+		}()
+	}
 }
 
 // Reload reloads all job configurations.

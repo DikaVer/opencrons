@@ -459,6 +459,104 @@ func TestJobConfig_Validate_RetryFields(t *testing.T) {
 	}
 }
 
+func TestJobConfig_Validate_OnSuccess(t *testing.T) {
+	dir := t.TempDir()
+
+	base := JobConfig{
+		Name:       "job-a",
+		Schedule:   "* * * * *",
+		PromptFile: "job-a.md",
+		WorkingDir: dir,
+	}
+
+	tests := []struct {
+		name        string
+		onSuccess   []string
+		wantErr     bool
+		errContains string
+	}{
+		{"empty list", nil, false, ""},
+		{"valid single", []string{"job-b"}, false, ""},
+		{"valid multiple", []string{"job-b", "job-c"}, false, ""},
+		{"self-reference", []string{"job-a"}, true, "cannot reference itself"},
+		{"invalid name spaces", []string{"bad name"}, true, "on_success entry"},
+		{"invalid name special chars", []string{"bad@name"}, true, "on_success entry"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			j := base
+			j.OnSuccess = tt.onSuccess
+			err := j.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+				t.Errorf("expected error containing %q, got %q", tt.errContains, err.Error())
+			}
+		})
+	}
+}
+
+func TestSaveJob_LoadJob_RoundTrip_OnSuccess(t *testing.T) {
+	dir := t.TempDir()
+	job := &JobConfig{
+		ID:               "xyz99999",
+		Name:             "chain-test",
+		Schedule:         "0 3 * * *",
+		WorkingDir:       ".",
+		PromptFile:       "chain-test.md",
+		Model:            "sonnet",
+		Enabled:          true,
+		OnSuccess:        []string{"job-b", "job-c"},
+	}
+
+	if err := SaveJob(dir, job); err != nil {
+		t.Fatalf("SaveJob: %v", err)
+	}
+
+	loaded, err := LoadJob(filepath.Join(dir, "chain-test.yml"))
+	if err != nil {
+		t.Fatalf("LoadJob: %v", err)
+	}
+
+	if len(loaded.OnSuccess) != len(job.OnSuccess) {
+		t.Fatalf("OnSuccess len = %d, want %d", len(loaded.OnSuccess), len(job.OnSuccess))
+	}
+	for i, name := range job.OnSuccess {
+		if loaded.OnSuccess[i] != name {
+			t.Errorf("OnSuccess[%d] = %q, want %q", i, loaded.OnSuccess[i], name)
+		}
+	}
+}
+
+func TestSaveJob_LoadJob_RoundTrip_OnSuccess_Empty(t *testing.T) {
+	dir := t.TempDir()
+	job := &JobConfig{
+		ID:         "abc00001",
+		Name:       "no-chain",
+		Schedule:   "0 4 * * *",
+		WorkingDir: ".",
+		PromptFile: "no-chain.md",
+		Enabled:    true,
+		// OnSuccess intentionally nil
+	}
+
+	if err := SaveJob(dir, job); err != nil {
+		t.Fatalf("SaveJob: %v", err)
+	}
+
+	loaded, err := LoadJob(filepath.Join(dir, "no-chain.yml"))
+	if err != nil {
+		t.Fatalf("LoadJob: %v", err)
+	}
+
+	if len(loaded.OnSuccess) != 0 {
+		t.Errorf("OnSuccess should be empty, got %v", loaded.OnSuccess)
+	}
+}
+
 func TestNormalizeWorkingDir(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows-only test")

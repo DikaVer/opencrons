@@ -54,6 +54,7 @@ func init() {
 	addCmd.Flags().StringArray("disallowed-tools", nil, "tools to deny (repeatable, e.g. --disallowed-tools \"Bash(git:*)\" --disallowed-tools \"Edit\")")
 	addCmd.Flags().Int("max-retries", 0, "number of retries on failure (0-10)")
 	addCmd.Flags().String("retry-backoff", "exponential", "retry delay strategy: exponential (default) or linear")
+	addCmd.Flags().StringArray("on-success", nil, "jobs to trigger on success (repeatable, e.g. --on-success job-b --on-success job-c)")
 
 	// Shell completion for enum flags
 	modelKeys := make([]string, 0, len(ui.ValidModels))
@@ -139,6 +140,7 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	if retryBackoff == "exponential" {
 		retryBackoff = ""
 	}
+	onSuccess, _ := cmd.Flags().GetStringArray("on-success")
 
 	// Validate required flags
 	var missing []string
@@ -189,11 +191,19 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		RetryBackoff:     retryBackoff,
 		NoSessionPersist: true,
 		Enabled:          true,
+		OnSuccess:        onSuccess,
 	}
 
 	// Validate the job config (defense-in-depth)
 	if err := job.Validate(); err != nil {
 		return err
+	}
+
+	// Verify on-success targets exist at creation time
+	for _, name := range onSuccess {
+		if !config.JobNameExists(platform.SchedulesDir(), name) {
+			return fmt.Errorf("--on-success references unknown job %q", name)
+		}
 	}
 
 	if err := config.SaveJob(platform.SchedulesDir(), job); err != nil {
@@ -217,6 +227,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	}
 	if summaryEnabled {
 		fmt.Printf("  Summary:  enabled\n")
+	}
+	if len(onSuccess) > 0 {
+		fmt.Printf("  On success: %s\n", strings.Join(onSuccess, ", "))
 	}
 	return nil
 }
