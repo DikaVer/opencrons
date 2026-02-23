@@ -386,15 +386,6 @@ OpenCrons is focused on Claude Code today, but the vision is broader.
 ### 🔜 Coming soon
 
 - ⌨️ **Codex CLI support** — run OpenAI's [Codex CLI](https://github.com/openai/codex) alongside Claude Code jobs
-- 🔌 **Plugin system** — interactive, controllable integrations:
-
-| Plugin | What it does |
-|--------|-------------|
-| 🐙 **GitHub** | Auto-review PRs, create issues, merge when checks pass |
-| 📧 **Email** | Morning digest, inbox triage, auto-replies |
-| 📐 **Linear** | Create/update issues from job results, sync sprint status |
-| 💬 **Slack** | Post summaries, respond to threads, channel notifications |
-| 📊 **Custom** | Bring your own plugin — webhook-based architecture |
 
 ### 🔮 Future ideas
 
