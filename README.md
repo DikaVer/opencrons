@@ -1,4 +1,4 @@
-<h1>🟪🟩 OpenCrons — Automated AI Scheduler</h1>
+<h1>🟪🟩 OpenCrons — Automated Agent Scheduler</h1>
 
 <div align="center">
   <img src="public/header.png" alt="OpenCrons" width="500">
@@ -60,13 +60,6 @@ This is intentional for automation — but it means **the prompt is the security
 - Set a `working_dir` that contains only what the job needs access to
 - Review execution logs regularly (`opencrons logs`)
 - Keep your Claude Code version up to date
-
-### Known limitations
-
-- Prompt files are stored as plain Markdown — no encryption at rest
-- `settings.json` stores your Telegram bot token in plaintext
-- No audit log beyond the SQLite execution records
-- No rate limiting or circuit breaker on job execution
 
 This project just released and does not yet cover all security aspects. Contributions and issues are welcome.
 
