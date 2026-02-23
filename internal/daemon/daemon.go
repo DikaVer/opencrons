@@ -214,14 +214,25 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 		if err != nil {
 			d.logger.Printf("Job %q execution error: %v", j.Name, err)
 			slogger.Error("job execution error", "name", j.Name, "err", err)
+			if bot := d.tgBot.Load(); bot != nil {
+				bot.NotifyJobComplete(ctx, j.Name, "failed", fmt.Sprintf("infrastructure error: %s", err.Error()))
+			}
 			return
 		}
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
 		slogger.Info("job completed", "name", j.Name, "status", result.Status, "duration", result.Duration)
 
-		// Notify via Telegram if bot is running
-		if bot := d.tgBot.Load(); bot != nil {
-			bot.NotifyJobComplete(ctx, j.Name, result.Status, result.Output)
+		// Notify via Telegram on failure or timeout only — success is silent.
+		if result.Status != "success" {
+			if bot := d.tgBot.Load(); bot != nil {
+				// For failed jobs prefer Claude's output; fall back to the exit error.
+				// For timeout the status label is sufficient — no fallback needed.
+				output := result.Output
+				if output == "" && result.Status == "failed" {
+					output = result.ErrorMsg
+				}
+				bot.NotifyJobComplete(ctx, j.Name, result.Status, output)
+			}
 		}
 	})
 	if err != nil {
