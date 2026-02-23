@@ -415,6 +415,50 @@ func TestFindJobByName(t *testing.T) {
 	}
 }
 
+func TestJobConfig_Validate_RetryFields(t *testing.T) {
+	dir := t.TempDir()
+
+	base := JobConfig{
+		Name:       "test",
+		Schedule:   "* * * * *",
+		PromptFile: "test.md",
+		WorkingDir: dir,
+	}
+
+	tests := []struct {
+		name         string
+		maxRetries   int
+		retryBackoff string
+		wantErr      bool
+		errContains  string
+	}{
+		{"no retries (default)", 0, "", false, ""},
+		{"valid retries + empty backoff", 3, "", false, ""},
+		{"valid retries + exponential", 5, "exponential", false, ""},
+		{"valid retries + linear", 2, "linear", false, ""},
+		{"max boundary", 10, "", false, ""},
+		{"too many retries", 11, "", true, "max_retries"},
+		{"negative retries", -1, "", true, "max_retries"},
+		{"invalid backoff", 1, "jitter", true, "retry_backoff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			job := base
+			job.MaxRetries = tt.maxRetries
+			job.RetryBackoff = tt.retryBackoff
+			err := job.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && !strings.Contains(err.Error(), tt.errContains) {
+				t.Errorf("error %q does not contain %q", err.Error(), tt.errContains)
+			}
+		})
+	}
+}
+
 func TestNormalizeWorkingDir(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows-only test")

@@ -52,6 +52,8 @@ func init() {
 	addCmd.Flags().Var(flagTimeout, "timeout", "timeout in seconds")
 	addCmd.Flags().Bool("summary", false, "enable Telegram-style summary after each run")
 	addCmd.Flags().StringArray("disallowed-tools", nil, "tools to deny (repeatable, e.g. --disallowed-tools \"Bash(git:*)\" --disallowed-tools \"Edit\")")
+	addCmd.Flags().Int("max-retries", 0, "number of retries on failure (0-10)")
+	addCmd.Flags().String("retry-backoff", "exponential", "retry delay strategy: exponential (default) or linear")
 
 	// Shell completion for enum flags
 	modelKeys := make([]string, 0, len(ui.ValidModels))
@@ -131,6 +133,12 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	promptContent, _ := cmd.Flags().GetString("prompt-content")
 	summaryEnabled, _ := cmd.Flags().GetBool("summary")
 	disallowedTools, _ := cmd.Flags().GetStringArray("disallowed-tools")
+	maxRetries, _ := cmd.Flags().GetInt("max-retries")
+	retryBackoff, _ := cmd.Flags().GetString("retry-backoff")
+	// "exponential" is the default; omit from config for clean YAML
+	if retryBackoff == "exponential" {
+		retryBackoff = ""
+	}
 
 	// Validate required flags
 	var missing []string
@@ -177,6 +185,8 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		Timeout:          timeout,
 		DisallowedTools:  disallowedTools,
 		SummaryEnabled:   summaryEnabled,
+		MaxRetries:       maxRetries,
+		RetryBackoff:     retryBackoff,
 		NoSessionPersist: true,
 		Enabled:          true,
 	}

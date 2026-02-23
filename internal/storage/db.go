@@ -71,12 +71,13 @@ func (db *DB) migrate() error {
 		return err
 	}
 
-	// Migration: add token usage columns (idempotent)
+	// Migration: add columns (idempotent — duplicate column errors are ignored)
 	migrations := []string{
 		"ALTER TABLE execution_logs ADD COLUMN input_tokens INTEGER",
 		"ALTER TABLE execution_logs ADD COLUMN output_tokens INTEGER",
 		"ALTER TABLE execution_logs ADD COLUMN cache_read_tokens INTEGER",
 		"ALTER TABLE execution_logs ADD COLUMN cache_creation_tokens INTEGER",
+		"ALTER TABLE execution_logs ADD COLUMN retry_attempt INTEGER DEFAULT 0",
 	}
 	for _, m := range migrations {
 		// Ignore "duplicate column" errors — column already exists
@@ -120,9 +121,9 @@ func (db *DB) migrate() error {
 // InsertLog creates a new execution log entry and returns its ID.
 func (db *DB) InsertLog(entry *ExecutionLog) (int64, error) {
 	result, err := db.conn.Exec(
-		`INSERT INTO execution_logs (job_id, job_name, started_at, status, trigger_type)
-		 VALUES (?, ?, ?, ?, ?)`,
-		entry.JobID, entry.JobName, entry.StartedAt, entry.Status, entry.TriggerType,
+		`INSERT INTO execution_logs (job_id, job_name, started_at, status, trigger_type, retry_attempt)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		entry.JobID, entry.JobName, entry.StartedAt, entry.Status, entry.TriggerType, entry.RetryAttempt,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("inserting log: %w", err)
@@ -160,7 +161,7 @@ func (db *DB) GetLogsByJobName(jobName string, limit int) ([]ExecutionLog, error
 		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
 		        stdout_path, stderr_path, cost_usd,
 		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-		        status, trigger_type, error_msg
+		        status, trigger_type, error_msg, retry_attempt
 		 FROM execution_logs
 		 WHERE job_name = ?
 		 ORDER BY started_at DESC
@@ -185,7 +186,7 @@ func (db *DB) GetRecentLogs(limit int) ([]ExecutionLog, error) {
 		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
 		        stdout_path, stderr_path, cost_usd,
 		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-		        status, trigger_type, error_msg
+		        status, trigger_type, error_msg, retry_attempt
 		 FROM execution_logs
 		 ORDER BY started_at DESC
 		 LIMIT ?`,
@@ -209,7 +210,7 @@ func (db *DB) GetFailedLogs(limit int) ([]ExecutionLog, error) {
 		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
 		        stdout_path, stderr_path, cost_usd,
 		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-		        status, trigger_type, error_msg
+		        status, trigger_type, error_msg, retry_attempt
 		 FROM execution_logs
 		 WHERE status IN ('failed', 'timeout')
 		 ORDER BY started_at DESC
@@ -234,7 +235,7 @@ func (db *DB) GetFailedLogsByJobName(jobName string, limit int) ([]ExecutionLog,
 		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
 		        stdout_path, stderr_path, cost_usd,
 		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-		        status, trigger_type, error_msg
+		        status, trigger_type, error_msg, retry_attempt
 		 FROM execution_logs
 		 WHERE job_name = ? AND status IN ('failed', 'timeout')
 		 ORDER BY started_at DESC
@@ -449,7 +450,7 @@ func scanLogs(rows *sql.Rows) ([]ExecutionLog, error) {
 			&entry.ID, &entry.JobID, &entry.JobName, &entry.StartedAt, &finishedAt,
 			&exitCode, &entry.StdoutPath, &entry.StderrPath, &costUSD,
 			&inputTokens, &outputTokens, &cacheReadTokens, &cacheCreationTokens,
-			&entry.Status, &entry.TriggerType, &entry.ErrorMsg,
+			&entry.Status, &entry.TriggerType, &entry.ErrorMsg, &entry.RetryAttempt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning log row: %w", err)

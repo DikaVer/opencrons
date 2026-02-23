@@ -57,7 +57,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Running job %q...\n", name)
 
-	result, err := executor.Run(ctx, db, job, "manual")
+	result, err := executor.Run(ctx, db, job, "manual", 0)
 	if err != nil {
 		return fmt.Errorf("execution failed: %w", err)
 	}

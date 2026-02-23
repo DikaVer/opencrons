@@ -322,7 +322,7 @@ func (b *Bot) runJob(ctx context.Context, chatID int64, jobName string) {
 	// callback handler's ctx may expire during long-running jobs.
 	execCtx := context.Background()
 
-	result, err := executor.Run(execCtx, b.db, job, "manual")
+	result, err := executor.Run(execCtx, b.db, job, "manual", 0)
 	if err != nil {
 		_ = b.SendPlain(execCtx, chatID, fmt.Sprintf("Execution failed: %v", err))
 		return

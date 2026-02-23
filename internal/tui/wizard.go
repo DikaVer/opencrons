@@ -64,6 +64,8 @@ func RunAddWizard() (*WizardResult, error) {
 		effort         string
 		timeout        string
 		summaryEnabled bool
+		maxRetries     string
+		retryBackoff   string = "exponential"
 	)
 
 	fmt.Println(ui.Title.MarginBottom(1).Render("  ✨ Add New Scheduled Job"))
@@ -177,7 +179,7 @@ func RunAddWizard() (*WizardResult, error) {
 			}),
 	)
 
-	// Step 7: Timeout & Summary
+	// Step 7: Timeout, Summary & Retry
 	step7 := huh.NewGroup(
 		huh.NewInput().
 			Title("⏱️  Timeout (seconds)").
@@ -189,6 +191,29 @@ func RunAddWizard() (*WizardResult, error) {
 			Title("📊 Enable Report Summarization").
 			Description("When enabled, Claude generates a short Telegram-style summary after each run.").
 			Value(&summaryEnabled),
+		huh.NewInput().
+			Title("🔁 Max Retries").
+			Description("How many times to retry on failure (0 = no retry, max 10). Exponential backoff: 30s→60s→120s…").
+			Placeholder("0").
+			Value(&maxRetries).
+			Validate(func(s string) error {
+				if s == "" {
+					return nil
+				}
+				n, err := strconv.Atoi(strings.TrimSpace(s))
+				if err != nil || n < 0 || n > 10 {
+					return fmt.Errorf("must be an integer between 0 and 10")
+				}
+				return nil
+			}),
+		huh.NewSelect[string]().
+			Title("📈 Retry Backoff").
+			Description("Delay strategy between retries.").
+			Options(
+				huh.NewOption("📈 Exponential — 30s, 60s, 120s… (recommended)", "exponential"),
+				huh.NewOption("📏 Linear — 30s, 60s, 90s…", "linear"),
+			).
+			Value(&retryBackoff),
 	)
 
 	form := huh.NewForm(step1, step2, step3, step4, step5, step6, step7).
@@ -245,6 +270,8 @@ func RunAddWizard() (*WizardResult, error) {
 		Effort:           effortVal,
 		DisallowedTools:  nilIfEmpty(computeDisallowedTools(allowedTools)),
 		SummaryEnabled:   summaryEnabled,
+		MaxRetries:       parseInt(maxRetries, 0),
+		RetryBackoff:     retryBackoffValue(maxRetries, retryBackoff),
 		NoSessionPersist: true,
 		Enabled:          true,
 	}
@@ -270,6 +297,14 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		timeout = fmt.Sprintf("%d", job.Timeout)
 	}
 	summaryEnabled := job.SummaryEnabled
+	maxRetries := ""
+	if job.MaxRetries > 0 {
+		maxRetries = fmt.Sprintf("%d", job.MaxRetries)
+	}
+	retryBackoff := job.RetryBackoff
+	if retryBackoff == "" {
+		retryBackoff = "exponential"
+	}
 
 	// Build set of currently disallowed tools to invert for the "allowed" UI
 	disabledSet := make(map[string]bool)
@@ -365,7 +400,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			}),
 	)
 
-	// Step 6: Timeout & Summary
+	// Step 6: Timeout, Summary & Retry
 	step6 := huh.NewGroup(
 		huh.NewInput().
 			Title("⏱️  Timeout (seconds)").
@@ -377,6 +412,29 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 			Description("Generates a short Telegram-style summary after each run.\n"+
 				"Summary is sent directly to Telegram as the job output.").
 			Value(&summaryEnabled),
+		huh.NewInput().
+			Title("🔁 Max Retries").
+			Description("How many times to retry on failure (0 = no retry, max 10). Exponential backoff: 30s→60s→120s…").
+			Placeholder("0").
+			Value(&maxRetries).
+			Validate(func(s string) error {
+				if s == "" {
+					return nil
+				}
+				n, err := strconv.Atoi(strings.TrimSpace(s))
+				if err != nil || n < 0 || n > 10 {
+					return fmt.Errorf("must be an integer between 0 and 10")
+				}
+				return nil
+			}),
+		huh.NewSelect[string]().
+			Title("📈 Retry Backoff").
+			Description("Delay strategy between retries.").
+			Options(
+				huh.NewOption("📈 Exponential — 30s, 60s, 120s… (recommended)", "exponential"),
+				huh.NewOption("📏 Linear — 30s, 60s, 90s…", "linear"),
+			).
+			Value(&retryBackoff),
 	)
 
 	form := huh.NewForm(step1, step2, step3, step4, step5, step6).
@@ -439,6 +497,8 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	job.Timeout = parseInt(timeout, 300)
 	job.DisallowedTools = nilIfEmpty(disallowed)
 	job.SummaryEnabled = summaryEnabled
+	job.MaxRetries = parseInt(maxRetries, 0)
+	job.RetryBackoff = retryBackoffValue(maxRetries, retryBackoff)
 
 	return &WizardResult{
 		Job:           job,
@@ -479,4 +539,17 @@ func nilIfEmpty(s []string) []string {
 		return nil
 	}
 	return s
+}
+
+// retryBackoffValue returns the backoff strategy to store in config.
+// Returns "" when no retries are configured (n=0) or when the strategy is
+// "exponential" (the default), keeping the YAML clean.
+func retryBackoffValue(maxRetriesStr, backoff string) string {
+	if parseInt(maxRetriesStr, 0) == 0 {
+		return ""
+	}
+	if backoff == "exponential" {
+		return "" // exponential is the default; omit for clean YAML
+	}
+	return backoff
 }

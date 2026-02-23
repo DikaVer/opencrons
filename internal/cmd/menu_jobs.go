@@ -148,7 +148,7 @@ func runJobByName(name string) {
 
 	fmt.Printf("  Running job %q...\n", name)
 
-	result, err := executor.Run(ctx, db, job, "manual")
+	result, err := executor.Run(ctx, db, job, "manual", 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  Execution failed: %v\n", err)
 		return

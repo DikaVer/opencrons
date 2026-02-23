@@ -25,6 +25,7 @@ type ExecutionLog struct {
 	Status               string     `json:"status"`
 	TriggerType          string     `json:"trigger_type"`
 	ErrorMsg             string     `json:"error_msg,omitempty"`
+	RetryAttempt         int        `json:"retry_attempt,omitempty"` // 0 = initial, 1+ = retry N
 }
 
 // UsageSummary holds aggregated usage stats.

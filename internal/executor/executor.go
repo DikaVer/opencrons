@@ -69,7 +69,8 @@ type Result struct {
 }
 
 // Run executes a job and logs the result to the database.
-func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType string) (*Result, error) {
+// attempt is 0 for the initial run, 1+ for retries.
+func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType string, attempt int) (*Result, error) {
 	workingDir, err := effectiveWorkingDir(job)
 	if err != nil {
 		return nil, err
@@ -93,11 +94,12 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	// Create log entry
 	entry := &storage.ExecutionLog{
-		JobID:       job.ID,
-		JobName:     job.Name,
-		StartedAt:   now,
-		Status:      "running",
-		TriggerType: triggerType,
+		JobID:        job.ID,
+		JobName:      job.Name,
+		StartedAt:    now,
+		Status:       "running",
+		TriggerType:  triggerType,
+		RetryAttempt: attempt,
 	}
 
 	logID, err := db.InsertLog(entry)

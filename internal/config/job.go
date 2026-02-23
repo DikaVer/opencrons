@@ -26,8 +26,10 @@ type JobConfig struct {
 	Effort           string   `yaml:"effort,omitempty"`
 	DisallowedTools  []string `yaml:"disallowed_tools,omitempty"`
 	SummaryEnabled   bool     `yaml:"summary_enabled,omitempty"`
-	NoSessionPersist bool   `yaml:"no_session_persistence,omitempty"`
-	Enabled          bool   `yaml:"enabled"`
+	NoSessionPersist bool     `yaml:"no_session_persistence,omitempty"`
+	MaxRetries       int      `yaml:"max_retries,omitempty"`   // 0 = no retries (default)
+	RetryBackoff     string   `yaml:"retry_backoff,omitempty"` // "exponential" (default) or "linear"
+	Enabled          bool     `yaml:"enabled"`
 }
 
 // Validate checks that all required fields are present and valid.
@@ -80,6 +82,15 @@ func (j *JobConfig) Validate() error {
 	// Validate timeout
 	if j.Timeout < 0 {
 		return fmt.Errorf("job %q: timeout cannot be negative", j.Name)
+	}
+
+	// Validate retry settings
+	if j.MaxRetries < 0 || j.MaxRetries > 10 {
+		return fmt.Errorf("job %q: max_retries must be between 0 and 10", j.Name)
+	}
+	// "" is the canonical sentinel for "exponential" (the default); omitted from YAML for cleanliness.
+	if j.RetryBackoff != "" && j.RetryBackoff != "exponential" && j.RetryBackoff != "linear" {
+		return fmt.Errorf("job %q: retry_backoff must be \"exponential\" or \"linear\"", j.Name)
 	}
 
 	return nil

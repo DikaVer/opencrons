@@ -85,6 +85,53 @@ func TestInsertLog_UpdateLog_GetLogs(t *testing.T) {
 	}
 }
 
+func TestInsertLog_RetryAttempt(t *testing.T) {
+	db := openTestDB(t)
+
+	for attempt := 0; attempt <= 2; attempt++ {
+		entry := &ExecutionLog{
+			JobID:        "j1",
+			JobName:      "retry-job",
+			StartedAt:    time.Now(),
+			Status:       "running",
+			TriggerType:  "scheduled",
+			RetryAttempt: attempt,
+		}
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatalf("InsertLog attempt %d: %v", attempt, err)
+		}
+		status := "failed"
+		if attempt == 2 {
+			status = "success"
+		}
+		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+			t.Fatalf("UpdateLog attempt %d: %v", attempt, err)
+		}
+	}
+
+	logs, err := db.GetLogsByJobName("retry-job", 10)
+	if err != nil {
+		t.Fatalf("GetLogsByJobName: %v", err)
+	}
+	if len(logs) != 3 {
+		t.Fatalf("got %d logs, want 3", len(logs))
+	}
+	// Logs are ordered most recent first; check RetryAttempt values are preserved.
+	for _, l := range logs {
+		if l.RetryAttempt < 0 || l.RetryAttempt > 2 {
+			t.Errorf("unexpected RetryAttempt %d", l.RetryAttempt)
+		}
+	}
+	// The latest log (index 0) should be the successful attempt 2.
+	if logs[0].RetryAttempt != 2 {
+		t.Errorf("latest log RetryAttempt = %d, want 2", logs[0].RetryAttempt)
+	}
+	if logs[0].Status != "success" {
+		t.Errorf("latest log Status = %q, want %q", logs[0].Status, "success")
+	}
+}
+
 func TestGetRecentLogs(t *testing.T) {
 	db := openTestDB(t)
 

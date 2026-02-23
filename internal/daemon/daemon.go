@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/DikaVer/opencrons/internal/chat"
 	"github.com/DikaVer/opencrons/internal/config"
@@ -87,6 +88,11 @@ func Run() error {
 			cron.WithParser(ui.CronParser),
 			cron.WithChain(
 				cron.Recover(cronLog),
+				// SkipIfStillRunning treats the entire retry sequence (including
+				// sleep delays between attempts) as a single "running" invocation.
+				// If a job with retries outlasts its schedule interval, subsequent
+				// scheduled firings are silently skipped until the sequence completes.
+				// This is intentional — it prevents retry storms from concurrent firings.
 				cron.SkipIfStillRunning(cronLog),
 			),
 		),
@@ -210,19 +216,48 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 		slogger.Info("executing job", "name", j.Name)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		result, err := executor.Run(ctx, d.db, j, "scheduled")
-		if err != nil {
-			d.logger.Printf("Job %q execution error: %v", j.Name, err)
-			slogger.Error("job execution error", "name", j.Name, "err", err)
-			if bot := d.tgBot.Load(); bot != nil {
-				bot.NotifyJobComplete(ctx, j.Name, "failed", fmt.Sprintf("infrastructure error: %s", err.Error()))
+
+		maxAttempts := 1 + j.MaxRetries
+		var result *executor.Result
+		var runErr error
+
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if attempt > 0 {
+				delay := retryDelay(j.RetryBackoff, attempt-1)
+				d.logger.Printf("Job %q retrying in %s (attempt %d/%d)", j.Name, delay, attempt+1, maxAttempts)
+				slogger.Info("job retry scheduled", "name", j.Name, "attempt", attempt+1, "delay", delay)
+				select {
+				case <-time.After(delay):
+				case <-ctx.Done():
+					return
+				}
 			}
-			return
+
+			result, runErr = executor.Run(ctx, d.db, j, "scheduled", attempt)
+			if runErr != nil {
+				// Setup error (working dir missing, etc.) — non-retryable
+				d.logger.Printf("Job %q setup error: %v", j.Name, runErr)
+				slogger.Error("job setup error", "name", j.Name, "err", runErr)
+				if bot := d.tgBot.Load(); bot != nil {
+					bot.NotifyJobComplete(ctx, j.Name, "failed", fmt.Sprintf("infrastructure error: %s", runErr.Error()))
+				}
+				return
+			}
+
+			if result.Status == "success" {
+				break
+			}
+
+			if attempt < maxAttempts-1 {
+				slogger.Warn("job failed, will retry", "name", j.Name,
+					"attempt", attempt+1, "maxAttempts", maxAttempts, "status", result.Status)
+			}
 		}
+
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
 		slogger.Info("job completed", "name", j.Name, "status", result.Status, "duration", result.Duration)
 
-		// Notify via Telegram on failure or timeout only — success is silent.
+		// Notify via Telegram after all attempts — only on failure or timeout.
 		if result.Status != "success" {
 			if bot := d.tgBot.Load(); bot != nil {
 				// For failed jobs prefer Claude's output; fall back to the exit error.
@@ -281,4 +316,26 @@ func (d *Daemon) Reload() {
 
 	d.logger.Printf("Reload complete: %d job(s) loaded", len(d.jobs))
 	slogger.Info("hot-reload complete", "jobs", len(d.jobs))
+}
+
+// retryDelay returns the wait duration before retry attempt retryIndex (0-based).
+// Exponential: 30s, 60s, 120s, 240s … capped at 5 minutes.
+// Linear: 30s, 60s, 90s …
+// "" is the canonical sentinel for "exponential" (default).
+func retryDelay(backoff string, retryIndex int) time.Duration {
+	const base = 30 * time.Second
+	const maxDelay = 5 * time.Minute
+	if backoff == "linear" {
+		return base * time.Duration(retryIndex+1)
+	}
+	// exponential (default): cap the shift index to avoid integer overflow.
+	// 2^4 * 30s = 480s already exceeds maxDelay, so no need to compute further.
+	if retryIndex > 4 {
+		return maxDelay
+	}
+	delay := base * (1 << uint(retryIndex))
+	if delay > maxDelay {
+		return maxDelay
+	}
+	return delay
 }
