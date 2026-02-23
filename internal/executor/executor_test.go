@@ -27,11 +27,6 @@ func setupTestEnv(t *testing.T) string {
 		t.Fatal(err)
 	}
 
-	// Create summary directory
-	if err := os.MkdirAll(filepath.Join(dir, "summary"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
 	return dir
 }
 
@@ -188,26 +183,6 @@ func TestBuildCommand_NoSessionPersistence(t *testing.T) {
 	}
 }
 
-func TestBuildCommand_SummaryEnabled(t *testing.T) {
-	setupTestEnv(t)
-	workDir := t.TempDir()
-
-	job := &config.JobConfig{
-		Name:           "test",
-		PromptFile:     "test.md",
-		WorkingDir:     workDir,
-		SummaryEnabled: true,
-	}
-
-	result, err := BuildCommand(context.Background(), job, workDir)
-	if err != nil {
-		t.Fatalf("BuildCommand: %v", err)
-	}
-
-	if result.SummaryPath == "" {
-		t.Error("expected SummaryPath to be set when SummaryEnabled is true")
-	}
-}
 
 func TestBuildCommand_PromptFileNotFound(t *testing.T) {
 	setupTestEnv(t)

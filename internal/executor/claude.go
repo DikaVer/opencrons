@@ -4,8 +4,7 @@
 // assembles CLI flags (--model, --permission-mode bypassPermissions,
 // --output-format json, --effort, --no-session-persistence). The prompt
 // is passed via stdin to avoid OS argument length limits and process list
-// exposure. BuildCommand returns an exec.Cmd ready to run, and BuildResult
-// holds the combined prompt text along with the constructed command.
+// exposure. BuildCommand returns an exec.Cmd ready to run.
 package executor
 
 import (
@@ -30,8 +29,7 @@ var taskPreamble string
 
 // BuildResult holds the constructed command and any metadata from the build process.
 type BuildResult struct {
-	Cmd         *exec.Cmd
-	SummaryPath string // non-empty if summary_enabled
+	Cmd *exec.Cmd
 }
 
 // BuildCommand constructs the `claude -p` command for a job.
@@ -78,19 +76,15 @@ func BuildCommand(ctx context.Context, job *config.JobConfig, workingDir string)
 	// Build final prompt: preamble + user prompt + optional summary injection
 	prompt := taskPreamble + string(promptContent)
 
-	var summaryPath string
-
 	// Append summary injection if enabled
 	if job.SummaryEnabled {
 		now := time.Now()
-		summaryPath = filepath.Join(platform.SummaryDir(), fmt.Sprintf("%s-%s.md", job.Name, now.Format("20060102-150405")))
 		injection := strings.NewReplacer(
-			"{{SUMMARY_PATH}}", summaryPath,
 			"{{JOB_NAME}}", job.Name,
 			"{{DATE}}", now.Format("2006-01-02 15:04"),
 		).Replace(summaryPromptTemplate)
 		prompt += injection
-		log.Debug("summary injection applied", "job", job.Name, "summaryPath", summaryPath)
+		log.Debug("summary injection applied", "job", job.Name)
 	}
 
 	// Pass prompt via stdin to avoid exposing it in process list
@@ -101,5 +95,5 @@ func BuildCommand(ctx context.Context, job *config.JobConfig, workingDir string)
 
 	log.Debug("built command", "args", strings.Join(args, " "), "dir", workingDir)
 
-	return &BuildResult{Cmd: cmd, SummaryPath: summaryPath}, nil
+	return &BuildResult{Cmd: cmd}, nil
 }

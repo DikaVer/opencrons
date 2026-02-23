@@ -2,7 +2,7 @@
 // OpenCron's runtime configuration layout.
 //
 // BaseDir returns the root configuration directory (with a test override mechanism).
-// Derived paths include SchedulesDir, PromptsDir, LogsDir, SummaryDir, DataDir,
+// Derived paths include SchedulesDir, PromptsDir, LogsDir, DataDir,
 // DBPath, PIDFile, AgentsDir, AgentsFile, SkillsDir, ProjectsDir, and ProjectDir.
 // EnsureDirs creates all required directories on first run. The actual default
 // base directory is resolved by platform-specific implementations of defaultBaseDir.
@@ -41,11 +41,6 @@ func PromptsDir() string {
 // LogsDir returns the path to the logs directory (stdout/stderr capture).
 func LogsDir() string {
 	return filepath.Join(BaseDir(), "logs")
-}
-
-// SummaryDir returns the path to the summary directory (execution summaries).
-func SummaryDir() string {
-	return filepath.Join(BaseDir(), "summary")
 }
 
 // DataDir returns the path to the data directory (SQLite DB).
@@ -103,7 +98,6 @@ func EnsureDirs() error {
 		SchedulesDir(),
 		PromptsDir(),
 		LogsDir(),
-		SummaryDir(),
 		DataDir(),
 		AgentsDir(),
 		SkillsDir(),

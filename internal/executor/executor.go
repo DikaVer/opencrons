@@ -57,7 +57,6 @@ type Result struct {
 	ExitCode            int
 	StdoutPath          string
 	StderrPath          string
-	SummaryPath         string // path to summary file (if summary_enabled)
 	Output              string // claude's result text from JSON output
 	Status              string
 	ErrorMsg            string
@@ -183,11 +182,6 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	} else {
 		result.ExitCode = 0
 		result.Status = "success"
-	}
-
-	// Set summary path if summary was enabled
-	if built.SummaryPath != "" {
-		result.SummaryPath = built.SummaryPath
 	}
 
 	// Parse usage from JSON stdout

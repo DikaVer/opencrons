@@ -160,7 +160,6 @@ Settings {
   ├── schedules/            # One YAML per job
   ├── prompts/              # One .md per job (prompt content)
   ├── logs/                 # stdout (.json) / stderr (.log) per execution
-  ├── summary/              # Execution summaries (when summary_enabled)
   ├── projects/<job_name>/  # Per-job workspace data (created lazily)
   ├── data/opencrons.db     # SQLite (WAL mode)
   ├── settings.json         # All settings (debug, provider, messenger, chat, daemon)
