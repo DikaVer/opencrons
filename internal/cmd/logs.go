@@ -1,6 +1,6 @@
 // File logs.go implements the logs command, which displays execution logs as JSON.
-// It supports an optional job name filter and a -n flag to limit the number of
-// entries returned.
+// It supports an optional job name filter, a -n flag to limit the number of
+// entries returned, and a --failed flag to show only failed/timed-out runs.
 package cmd
 
 import (
@@ -24,6 +24,7 @@ var logsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(logsCmd)
 	logsCmd.Flags().IntP("limit", "n", 20, "number of entries to show")
+	logsCmd.Flags().Bool("failed", false, "show only failed and timed-out runs")
 }
 
 func runLogs(cmd *cobra.Command, args []string) error {
@@ -32,6 +33,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	limit, _ := cmd.Flags().GetInt("limit")
+	failedOnly, _ := cmd.Flags().GetBool("failed")
 
 	db, err := storage.Open(platform.DBPath())
 	if err != nil {
@@ -40,9 +42,14 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	defer func() { _ = db.Close() }()
 
 	var logs []storage.ExecutionLog
-	if len(args) > 0 {
+	switch {
+	case failedOnly && len(args) > 0:
+		logs, err = db.GetFailedLogsByJobName(args[0], limit)
+	case failedOnly:
+		logs, err = db.GetFailedLogs(limit)
+	case len(args) > 0:
 		logs, err = db.GetLogsByJobName(args[0], limit)
-	} else {
+	default:
 		logs, err = db.GetRecentLogs(limit)
 	}
 	if err != nil {

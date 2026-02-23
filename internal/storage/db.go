@@ -199,6 +199,56 @@ func (db *DB) GetRecentLogs(limit int) ([]ExecutionLog, error) {
 	return scanLogs(rows)
 }
 
+// GetFailedLogs returns failed or timed-out execution logs across all jobs, most recent first.
+func (db *DB) GetFailedLogs(limit int) ([]ExecutionLog, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	rows, err := db.conn.Query(
+		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
+		        stdout_path, stderr_path, cost_usd,
+		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+		        status, trigger_type, error_msg
+		 FROM execution_logs
+		 WHERE status IN ('failed', 'timeout')
+		 ORDER BY started_at DESC
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying failed logs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanLogs(rows)
+}
+
+// GetFailedLogsByJobName returns failed or timed-out execution logs for a specific job, most recent first.
+func (db *DB) GetFailedLogsByJobName(jobName string, limit int) ([]ExecutionLog, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	rows, err := db.conn.Query(
+		`SELECT id, job_id, job_name, started_at, finished_at, exit_code,
+		        stdout_path, stderr_path, cost_usd,
+		        input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+		        status, trigger_type, error_msg
+		 FROM execution_logs
+		 WHERE job_name = ? AND status IN ('failed', 'timeout')
+		 ORDER BY started_at DESC
+		 LIMIT ?`,
+		jobName, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying failed logs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanLogs(rows)
+}
+
 // GetUsageByJobName returns aggregated usage stats for a specific job.
 func (db *DB) GetUsageByJobName(jobName string) (*UsageSummary, error) {
 	row := db.conn.QueryRow(

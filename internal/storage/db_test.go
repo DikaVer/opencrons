@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -354,5 +355,86 @@ func TestGetLogsByJobName_Empty(t *testing.T) {
 	}
 	if logs != nil {
 		t.Errorf("expected nil slice for empty result, got %d items", len(logs))
+	}
+}
+
+func TestGetFailedLogs(t *testing.T) {
+	db := openTestDB(t)
+
+	// Insert logs with mixed statuses
+	statuses := []string{"success", "failed", "timeout", "failed", "cancelled"}
+	for i, status := range statuses {
+		entry := &ExecutionLog{
+			JobID:       fmt.Sprintf("j%d", i),
+			JobName:     fmt.Sprintf("job-%d", i),
+			StartedAt:   time.Now().Add(time.Duration(i) * time.Second),
+			Status:      "running",
+			TriggerType: "scheduled",
+		}
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	logs, err := db.GetFailedLogs(10)
+	if err != nil {
+		t.Fatalf("GetFailedLogs: %v", err)
+	}
+	if len(logs) != 3 {
+		t.Fatalf("got %d logs, want 3 (failed+timeout+failed)", len(logs))
+	}
+	for _, l := range logs {
+		if l.Status != "failed" && l.Status != "timeout" {
+			t.Errorf("unexpected status %q in failed logs", l.Status)
+		}
+	}
+}
+
+func TestGetFailedLogsByJobName(t *testing.T) {
+	db := openTestDB(t)
+
+	// Insert two jobs: one with a failure, one with success
+	for i, status := range []string{"failed", "success"} {
+		entry := &ExecutionLog{
+			JobID:       fmt.Sprintf("x%d", i),
+			JobName:     "target-job",
+			StartedAt:   time.Now().Add(time.Duration(i) * time.Second),
+			Status:      "running",
+			TriggerType: "scheduled",
+		}
+		id, err := db.InsertLog(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Insert a timeout for a different job — should not appear
+	entry := &ExecutionLog{JobID: "other", JobName: "other-job", StartedAt: time.Now(), Status: "running", TriggerType: "scheduled"}
+	id, err := db.InsertLog(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, "timeout", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	logs, err := db.GetFailedLogsByJobName("target-job", 10)
+	if err != nil {
+		t.Fatalf("GetFailedLogsByJobName: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("got %d logs, want 1", len(logs))
+	}
+	if logs[0].Status != "failed" {
+		t.Errorf("status = %q, want 'failed'", logs[0].Status)
+	}
+	if logs[0].JobName != "target-job" {
+		t.Errorf("job_name = %q, want 'target-job'", logs[0].JobName)
 	}
 }
