@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/DikaVer/opencrons/internal/config"
 	"github.com/DikaVer/opencrons/internal/platform"
@@ -45,7 +46,12 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		fmt.Printf("  OK    %s\n", job.Name)
+		if job.WorkingDir == "" {
+			managedDir := filepath.Join(platform.ProjectsDir(), job.Name)
+			fmt.Printf("  OK    %s (working dir: %s — auto-created on first run)\n", job.Name, managedDir)
+		} else {
+			fmt.Printf("  OK    %s\n", job.Name)
+		}
 	}
 
 	if hasErrors {

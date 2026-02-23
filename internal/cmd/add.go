@@ -44,7 +44,7 @@ func init() {
 	addCmd.Flags().Bool("non-interactive", false, "non-interactive mode (all params via flags)")
 	addCmd.Flags().Var(flagName, "name", "job name (required)")
 	addCmd.Flags().Var(flagSchedule, "schedule", "cron schedule expression (required)")
-	addCmd.Flags().Var(flagWorkingDir, "working-dir", "working directory (required)")
+	addCmd.Flags().Var(flagWorkingDir, "working-dir", "working directory (default: projects/<name>/)")
 	addCmd.Flags().String("prompt-file", "", "prompt file name (default: <name>.md)")
 	addCmd.Flags().String("prompt-content", "", "prompt content (written to prompt file)")
 	addCmd.Flags().Var(flagModel, "model", "Claude model: sonnet, opus, haiku")
@@ -139,9 +139,6 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	}
 	if !cmd.Flags().Changed("schedule") {
 		missing = append(missing, "--schedule")
-	}
-	if !cmd.Flags().Changed("working-dir") {
-		missing = append(missing, "--working-dir")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("required flags missing: %s", strings.Join(missing, ", "))

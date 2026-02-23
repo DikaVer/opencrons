@@ -35,16 +35,53 @@ func setupTestEnv(t *testing.T) string {
 	return dir
 }
 
+func TestEffectiveWorkingDir_ExplicitPassthrough(t *testing.T) {
+	setupTestEnv(t)
+	explicit := t.TempDir()
+
+	job := &config.JobConfig{Name: "my-job", WorkingDir: explicit}
+	got, err := effectiveWorkingDir(job)
+	if err != nil {
+		t.Fatalf("effectiveWorkingDir: %v", err)
+	}
+	if got != explicit {
+		t.Errorf("got %q, want %q", got, explicit)
+	}
+}
+
+func TestEffectiveWorkingDir_EmptyUsesProjectDir(t *testing.T) {
+	base := setupTestEnv(t)
+
+	job := &config.JobConfig{Name: "my-job", WorkingDir: ""}
+	got, err := effectiveWorkingDir(job)
+	if err != nil {
+		t.Fatalf("effectiveWorkingDir: %v", err)
+	}
+
+	want := filepath.Join(base, "projects", "my-job")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// Directory must have been created on disk
+	if info, err := os.Stat(got); err != nil {
+		t.Errorf("project directory not created: %v", err)
+	} else if !info.IsDir() {
+		t.Error("project directory path is not a directory")
+	}
+}
+
 func TestBuildCommand_BasicArgs(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:       "test",
 		PromptFile: "test.md",
-		WorkingDir: t.TempDir(),
+		WorkingDir: workDir,
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -65,15 +102,16 @@ func TestBuildCommand_BasicArgs(t *testing.T) {
 
 func TestBuildCommand_WithModel(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:       "test",
 		PromptFile: "test.md",
-		WorkingDir: t.TempDir(),
+		WorkingDir: workDir,
 		Model:      "opus",
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -86,15 +124,16 @@ func TestBuildCommand_WithModel(t *testing.T) {
 
 func TestBuildCommand_WithEffort(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:       "test",
 		PromptFile: "test.md",
-		WorkingDir: t.TempDir(),
+		WorkingDir: workDir,
 		Effort:     "max",
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -107,15 +146,16 @@ func TestBuildCommand_WithEffort(t *testing.T) {
 
 func TestBuildCommand_WithDisallowedTools(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:            "test",
 		PromptFile:      "test.md",
-		WorkingDir:      t.TempDir(),
+		WorkingDir:      workDir,
 		DisallowedTools: []string{"Bash(git:*)", "Edit"},
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -128,15 +168,16 @@ func TestBuildCommand_WithDisallowedTools(t *testing.T) {
 
 func TestBuildCommand_NoSessionPersistence(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:             "test",
 		PromptFile:       "test.md",
-		WorkingDir:       t.TempDir(),
+		WorkingDir:       workDir,
 		NoSessionPersist: true,
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -149,15 +190,16 @@ func TestBuildCommand_NoSessionPersistence(t *testing.T) {
 
 func TestBuildCommand_SummaryEnabled(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:           "test",
 		PromptFile:     "test.md",
-		WorkingDir:     t.TempDir(),
+		WorkingDir:     workDir,
 		SummaryEnabled: true,
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}
@@ -169,14 +211,15 @@ func TestBuildCommand_SummaryEnabled(t *testing.T) {
 
 func TestBuildCommand_PromptFileNotFound(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	job := &config.JobConfig{
 		Name:       "test",
 		PromptFile: "nonexistent.md",
-		WorkingDir: t.TempDir(),
+		WorkingDir: workDir,
 	}
 
-	_, err := BuildCommand(context.Background(), job)
+	_, err := BuildCommand(context.Background(), job, workDir)
 	if err == nil {
 		t.Error("expected error for missing prompt file")
 	}
@@ -184,6 +227,7 @@ func TestBuildCommand_PromptFileNotFound(t *testing.T) {
 
 func TestBuildCommand_PromptContent(t *testing.T) {
 	setupTestEnv(t)
+	workDir := t.TempDir()
 
 	promptContent := "Run the tests and report results."
 	if err := os.WriteFile(filepath.Join(platform.PromptsDir(), "content-test.md"), []byte(promptContent), 0644); err != nil {
@@ -193,10 +237,10 @@ func TestBuildCommand_PromptContent(t *testing.T) {
 	job := &config.JobConfig{
 		Name:       "test",
 		PromptFile: "content-test.md",
-		WorkingDir: t.TempDir(),
+		WorkingDir: workDir,
 	}
 
-	result, err := BuildCommand(context.Background(), job)
+	result, err := BuildCommand(context.Background(), job, workDir)
 	if err != nil {
 		t.Fatalf("BuildCommand: %v", err)
 	}

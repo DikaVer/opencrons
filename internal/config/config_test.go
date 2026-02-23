@@ -9,8 +9,6 @@ import (
 )
 
 func TestJobConfig_Validate_RequiredFields(t *testing.T) {
-	dir := t.TempDir()
-
 	tests := []struct {
 		name    string
 		job     JobConfig
@@ -19,18 +17,53 @@ func TestJobConfig_Validate_RequiredFields(t *testing.T) {
 		{"missing name", JobConfig{}, "job name is required"},
 		{"missing schedule", JobConfig{Name: "test"}, "schedule is required"},
 		{"missing prompt_file", JobConfig{Name: "test", Schedule: "* * * * *"}, "prompt_file is required"},
-		{"missing working_dir", JobConfig{Name: "test", Schedule: "* * * * *", PromptFile: "test.md"}, "working_dir is required"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = dir // prevent unused
 			err := tt.job.Validate()
 			if err == nil {
 				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
 			}
 			if got := err.Error(); !strings.Contains(got, tt.wantErr) {
 				t.Errorf("expected error containing %q, got %q", tt.wantErr, got)
+			}
+		})
+	}
+}
+
+func TestJobConfig_Validate_WorkingDir(t *testing.T) {
+	existingDir := t.TempDir()
+	nonexistentDir := filepath.Join(t.TempDir(), "does-not-exist")
+
+	// Create a file (not a directory) to test the is-not-a-dir branch
+	fileNotDir := filepath.Join(t.TempDir(), "a-file.txt")
+	if err := os.WriteFile(fileNotDir, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		workingDir string
+		wantErr    bool
+	}{
+		{"empty (project folder)", "", false},
+		{"valid existing dir", existingDir, false},
+		{"nonexistent dir", nonexistentDir, true},
+		{"path is a file not a dir", fileNotDir, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			job := JobConfig{
+				Name:       "test",
+				Schedule:   "* * * * *",
+				PromptFile: "test.md",
+				WorkingDir: tt.workingDir,
+			}
+			err := job.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

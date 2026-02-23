@@ -35,7 +35,9 @@ type BuildResult struct {
 }
 
 // BuildCommand constructs the `claude -p` command for a job.
-func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, error) {
+// workingDir is the resolved working directory (may differ from job.WorkingDir
+// when the job uses the managed project folder).
+func BuildCommand(ctx context.Context, job *config.JobConfig, workingDir string) (*BuildResult, error) {
 	args := []string{"-p"}
 
 	// Model
@@ -95,9 +97,9 @@ func BuildCommand(ctx context.Context, job *config.JobConfig) (*BuildResult, err
 	// and to avoid OS argument length limits
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Stdin = strings.NewReader(prompt)
-	cmd.Dir = job.WorkingDir
+	cmd.Dir = workingDir
 
-	log.Debug("built command", "args", strings.Join(args, " "), "dir", job.WorkingDir)
+	log.Debug("built command", "args", strings.Join(args, " "), "dir", workingDir)
 
 	return &BuildResult{Cmd: cmd, SummaryPath: summaryPath}, nil
 }

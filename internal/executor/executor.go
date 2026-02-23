@@ -26,6 +26,20 @@ import (
 
 var log = logger.New("executor")
 
+// effectiveWorkingDir returns the working directory to use for a job.
+// When job.WorkingDir is empty the job uses its managed project folder
+// (platform.ProjectDir(job.Name)), which is created lazily on first run.
+func effectiveWorkingDir(job *config.JobConfig) (string, error) {
+	if job.WorkingDir != "" {
+		return job.WorkingDir, nil
+	}
+	dir := platform.ProjectDir(job.Name)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("creating project directory for job %q: %w", job.Name, err)
+	}
+	return dir, nil
+}
+
 // claudeOutput represents the JSON output from `claude -p --output-format json`.
 type claudeOutput struct {
 	Result       string  `json:"result"`
@@ -57,13 +71,22 @@ type Result struct {
 
 // Run executes a job and logs the result to the database.
 func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType string) (*Result, error) {
-	log.Info("job started", "name", job.Name, "trigger", triggerType, "dir", job.WorkingDir)
+	workingDir, err := effectiveWorkingDir(job)
+	if err != nil {
+		return nil, err
+	}
 
-	// Validate working directory still exists at runtime
-	if info, err := os.Stat(job.WorkingDir); err != nil {
-		return nil, fmt.Errorf("job %q: working directory %q does not exist — was it deleted after job creation?", job.Name, job.WorkingDir)
-	} else if !info.IsDir() {
-		return nil, fmt.Errorf("job %q: working directory %q is not a directory", job.Name, job.WorkingDir)
+	log.Info("job started", "name", job.Name, "trigger", triggerType, "dir", workingDir)
+
+	// Validate working directory still exists at runtime.
+	// Managed project folders (empty WorkingDir) are created by effectiveWorkingDir above,
+	// so only explicit directories need a presence check here.
+	if job.WorkingDir != "" {
+		if info, err := os.Stat(workingDir); err != nil {
+			return nil, fmt.Errorf("job %q: working directory %q does not exist or is not accessible", job.Name, workingDir)
+		} else if !info.IsDir() {
+			return nil, fmt.Errorf("job %q: working directory %q is not a directory", job.Name, workingDir)
+		}
 	}
 
 	now := time.Now()
@@ -110,7 +133,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 	}
 
 	// Build command with context (supports cancellation and timeout)
-	built, err := BuildCommand(ctx, job)
+	built, err := BuildCommand(ctx, job, workingDir)
 	if err != nil {
 		result := &Result{
 			ExitCode: -1,

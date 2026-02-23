@@ -9,7 +9,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -67,8 +66,6 @@ func RunAddWizard() (*WizardResult, error) {
 		summaryEnabled bool
 	)
 
-	cwd, _ := os.Getwd()
-
 	fmt.Println(ui.Title.MarginBottom(1).Render("  ✨ Add New Scheduled Job"))
 
 	// Step 1: Job identity
@@ -89,12 +86,12 @@ func RunAddWizard() (*WizardResult, error) {
 			}),
 		huh.NewInput().
 			Title("📁 Working Directory").
-			Description("The project directory where Claude will execute. Claude can only access files in this directory and its subdirectories.").
-			Placeholder(cwd).
+			Description("Directory where Claude executes. Leave empty to use projects/<job-name>/ (auto-created). Enter a path to use an existing directory.").
+			Placeholder("(leave empty for managed project folder)").
 			Value(&workingDir).
 			Validate(func(s string) error {
 				if s == "" {
-					return nil // will default to cwd
+					return nil // empty = use managed project folder
 				}
 				return ui.ValidateDirectory(s)
 			}),
@@ -228,11 +225,6 @@ func RunAddWizard() (*WizardResult, error) {
 		schedule = customCron
 	} else {
 		schedule = presetKey
-	}
-
-	// Default working dir to cwd
-	if workingDir == "" {
-		workingDir = cwd
 	}
 
 	// Normalize effort: "high" is the default, omit it from config
