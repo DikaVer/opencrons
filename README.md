@@ -1,4 +1,4 @@
-<h1>🟪🟩 OpenCrons — Automated AI Scheduler</h1>
+<h1>🟪🟩 OpenCrons — Automated Agent Scheduler</h1>
 
 <div align="center">
   <img src="public/header.png" alt="OpenCrons" width="500">
@@ -60,13 +60,6 @@ This is intentional for automation — but it means **the prompt is the security
 - Set a `working_dir` that contains only what the job needs access to
 - Review execution logs regularly (`opencrons logs`)
 - Keep your Claude Code version up to date
-
-### Known limitations
-
-- Prompt files are stored as plain Markdown — no encryption at rest
-- `settings.json` stores your Telegram bot token in plaintext
-- No audit log beyond the SQLite execution records
-- No rate limiting or circuit breaker on job execution
 
 This project just released and does not yet cover all security aspects. Contributions and issues are welcome.
 
@@ -386,15 +379,6 @@ OpenCrons is focused on Claude Code today, but the vision is broader.
 ### 🔜 Coming soon
 
 - ⌨️ **Codex CLI support** — run OpenAI's [Codex CLI](https://github.com/openai/codex) alongside Claude Code jobs
-- 🔌 **Plugin system** — interactive, controllable integrations:
-
-| Plugin | What it does |
-|--------|-------------|
-| 🐙 **GitHub** | Auto-review PRs, create issues, merge when checks pass |
-| 📧 **Email** | Morning digest, inbox triage, auto-replies |
-| 📐 **Linear** | Create/update issues from job results, sync sprint status |
-| 💬 **Slack** | Post summaries, respond to threads, channel notifications |
-| 📊 **Custom** | Bring your own plugin — webhook-based architecture |
 
 ### 🔮 Future ideas
 
