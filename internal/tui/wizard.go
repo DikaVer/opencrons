@@ -1,10 +1,13 @@
 // wizard.go implements the job creation and editing wizards.
 //
 // WizardResult holds the resulting job configuration and prompt content.
-// RunAddWizard presents a 7-step form covering name, working directory, schedule
-// (presets or custom cron), prompt text, model, effort, allowed tools, timeout,
-// and summary toggle. RunEditWizard allows modifying an existing job's
-// configuration. Both wizards use the Catppuccin Mocha theme.
+// RunAddWizard presents a multi-step form covering name, working directory,
+// schedule (presets or custom cron), prompt text, model+effort, allowed tools,
+// timeout, retry, and summary toggle. RunEditWizard modifies an existing job.
+// Both wizards use the Catppuccin Mocha theme.
+//
+// Each huh.Group is built by a named step-builder function so that adding or
+// reordering wizard fields requires editing only the relevant builder.
 package tui
 
 import (
@@ -52,31 +55,16 @@ type WizardResult struct {
 	PromptContent string
 }
 
-// RunAddWizard runs the interactive wizard to create a new job.
-func RunAddWizard() (*WizardResult, error) {
-	var (
-		name           string
-		workingDir     string
-		schedule       string
-		presetKey      string
-		prompt         string
-		model          string
-		effort         string
-		timeout        string
-		summaryEnabled bool
-		maxRetries     string
-		retryBackoff   string = "exponential"
-	)
+// ── Step builder functions ────────────────────────────────────────────────────
 
-	fmt.Println(ui.Title.MarginBottom(1).Render("  ✨ Add New Scheduled Job"))
-
-	// Step 1: Job identity
-	step1 := huh.NewGroup(
+// buildNameStep builds the job identity step (name + working directory).
+func buildNameStep(name, workingDir *string) *huh.Group {
+	return huh.NewGroup(
 		huh.NewInput().
 			Title("🏷️  Job Name").
 			Description("Unique identifier for this job. Use lowercase with hyphens (e.g. nightly-review, weekly-audit).").
 			Placeholder("nightly-review").
-			Value(&name).
+			Value(name).
 			Validate(func(s string) error {
 				if err := ui.ValidateJobName(s); err != nil {
 					return err
@@ -90,7 +78,7 @@ func RunAddWizard() (*WizardResult, error) {
 			Title("📁 Working Directory").
 			Description("Directory where Claude executes. Leave empty to use projects/<job-name>/ (auto-created). Enter a path to use an existing directory.").
 			Placeholder("(leave empty for managed project folder)").
-			Value(&workingDir).
+			Value(workingDir).
 			Validate(func(s string) error {
 				if s == "" {
 					return nil // empty = use managed project folder
@@ -98,12 +86,15 @@ func RunAddWizard() (*WizardResult, error) {
 				return ui.ValidateDirectory(s)
 			}),
 	)
+}
 
-	// Step 2: Schedule
-	step2 := huh.NewGroup(
+// buildScheduleStep builds the schedule preset step.
+// desc is shown as the field description; pass the current schedule for edit mode.
+func buildScheduleStep(presetKey *string, desc string) *huh.Group {
+	return huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("⏰ Schedule").
-			Description("When should this job run? Uses standard cron format (minute hour day-of-month month day-of-week).").
+			Description(desc).
 			Options(
 				huh.NewOption("🔄 Every hour", "0 * * * *"),
 				huh.NewOption("🔄 Every 6 hours", "0 */6 * * *"),
@@ -112,23 +103,27 @@ func RunAddWizard() (*WizardResult, error) {
 				huh.NewOption("📅 Weekly (Monday 9 AM)", "0 9 * * 1"),
 				huh.NewOption("✏️  Custom cron expression", "custom"),
 			).
-			Value(&presetKey),
+			Value(presetKey),
 	)
+}
 
-	// Step 3: Prompt
-	step3 := huh.NewGroup(
+// buildPromptStep builds the prompt text entry step.
+func buildPromptStep(prompt *string) *huh.Group {
+	return huh.NewGroup(
 		huh.NewText().
 			Title("📝 Prompt").
 			Description("What should Claude do? Be specific: describe the task, expected output, and any constraints.\nTip: For polished prompts, use /schedule add inside Claude Code instead.").
 			Placeholder("Review all changed files for security vulnerabilities and generate a report...").
 			CharLimit(5000).
 			Lines(6).
-			Value(&prompt).
+			Value(prompt).
 			Validate(ui.ValidateNonEmpty),
 	)
+}
 
-	// Step 4: Model
-	step4 := huh.NewGroup(
+// buildModelEffortStep builds the combined model and effort selection step.
+func buildModelEffortStep(model, effort *string) *huh.Group {
+	return huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("🧠 Model").
 			Description("Which Claude model to use. Sonnet is the best balance of speed and capability for most tasks.").
@@ -137,11 +132,7 @@ func RunAddWizard() (*WizardResult, error) {
 				huh.NewOption("🧠 Opus — most capable, best for complex reasoning", "opus"),
 				huh.NewOption("🐇 Haiku — fastest, cheapest, good for simple tasks", "haiku"),
 			).
-			Value(&model),
-	)
-
-	// Step 5: Effort Level
-	step5 := huh.NewGroup(
+			Value(model),
 		huh.NewSelect[string]().
 			Title("💪 Effort Level").
 			Description("Controls how much thinking effort Claude puts in. Higher = better results but more tokens.\n"+
@@ -152,25 +143,19 @@ func RunAddWizard() (*WizardResult, error) {
 				huh.NewOption("💨 Low — most token-efficient, good for simple tasks", "low"),
 				huh.NewOption("💎 Max — absolute maximum capability (Opus only)", "max"),
 			).
-			Value(&effort),
+			Value(effort),
 	)
+}
 
-	// Step 6: Allowed Tools — select which tools Claude can use
-	var allowedTools []string
-	var toolOptions []huh.Option[string]
-	for _, t := range claudeCodeTools {
-		opt := huh.NewOption(t.Label, t.Name)
-		if defaultAllowedTools[t.Name] {
-			opt = opt.Selected(true)
-		}
-		toolOptions = append(toolOptions, opt)
-	}
-	step6 := huh.NewGroup(
+// buildToolsStep builds the allowed tools multi-select step.
+// options must be pre-built by the caller (selections differ between add and edit).
+func buildToolsStep(allowedTools *[]string, options []huh.Option[string]) *huh.Group {
+	return huh.NewGroup(
 		huh.NewMultiSelect[string]().
 			Title("🔧 Allowed Tools").
 			Description("Selected tools will be AVAILABLE during job execution. Deselect to deny.").
-			Options(toolOptions...).
-			Value(&allowedTools).
+			Options(options...).
+			Value(allowedTools).
 			Validate(func(t []string) error {
 				if len(t) == 0 {
 					return fmt.Errorf("at least one tool must be allowed")
@@ -178,24 +163,26 @@ func RunAddWizard() (*WizardResult, error) {
 				return nil
 			}),
 	)
+}
 
-	// Step 7: Timeout, Summary & Retry
-	step7 := huh.NewGroup(
+// buildTimeoutRetryStep builds the timeout, summary, and retry configuration step.
+func buildTimeoutRetryStep(timeout, maxRetries, retryBackoff *string, summaryEnabled *bool) *huh.Group {
+	return huh.NewGroup(
 		huh.NewInput().
 			Title("⏱️  Timeout (seconds)").
 			Description("Maximum wall-clock time for the job. The process is killed if it exceeds this limit.\n"+
-				"Quick tasks: 60-120s. Standard tasks: 300s (5 min). Complex tasks: 600-900s. Default: 300.").
+				"Quick: 60-120s. Standard: 300s (5 min). Complex: 600-900s. Enter 0 to disable the timeout. Default: 300.").
 			Placeholder("300").
-			Value(&timeout),
+			Value(timeout),
 		huh.NewConfirm().
 			Title("📊 Enable Report Summarization").
 			Description("When enabled, Claude generates a short Telegram-style summary after each run.").
-			Value(&summaryEnabled),
+			Value(summaryEnabled),
 		huh.NewInput().
 			Title("🔁 Max Retries").
 			Description("How many times to retry on failure (0 = no retry, max 10). Exponential backoff: 30s→60s→120s…").
 			Placeholder("0").
-			Value(&maxRetries).
+			Value(maxRetries).
 			Validate(func(s string) error {
 				if s == "" {
 					return nil
@@ -213,11 +200,54 @@ func RunAddWizard() (*WizardResult, error) {
 				huh.NewOption("📈 Exponential — 30s, 60s, 120s… (recommended)", "exponential"),
 				huh.NewOption("📏 Linear — 30s, 60s, 90s…", "linear"),
 			).
-			Value(&retryBackoff),
+			Value(retryBackoff),
+	)
+}
+
+// buildOnSuccessStep builds the job-chaining multi-select step.
+// options must be pre-built by the caller (depends on existing jobs).
+func buildOnSuccessStep(onSuccess *[]string, options []huh.Option[string]) *huh.Group {
+	return huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("🔗 On Success: Chain To Jobs").
+			Description("Jobs to run automatically when this job completes successfully.\nUseful for multi-step workflows (leave empty to skip).").
+			Options(options...).
+			Value(onSuccess),
+	)
+}
+
+// ── Wizard entry points ───────────────────────────────────────────────────────
+
+// RunAddWizard runs the interactive wizard to create a new job.
+func RunAddWizard() (*WizardResult, error) {
+	var (
+		name           string
+		workingDir     string
+		presetKey      string
+		prompt         string
+		model          string
+		effort         string
+		timeout        string
+		summaryEnabled bool
+		maxRetries     string
+		retryBackoff   = "exponential"
+		allowedTools   []string
+		onSuccess      []string
 	)
 
-	// Step 8 (optional): On Success — chain to other jobs
-	var onSuccess []string
+	fmt.Println(ui.Title.MarginBottom(1).Render("  ✨ Add New Scheduled Job"))
+
+	// Build tool options with default selections.
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if defaultAllowedTools[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
+
+	// Build on-success options from enabled jobs.
 	existingJobs, _ := config.LoadAllJobs(platform.SchedulesDir())
 	var onSuccessOptions []huh.Option[string]
 	for _, j := range existingJobs {
@@ -226,21 +256,20 @@ func RunAddWizard() (*WizardResult, error) {
 		}
 	}
 
-	groups := []*huh.Group{step1, step2, step3, step4, step5, step6, step7}
+	const scheduleDesc = "When should this job run? Uses standard cron format (minute hour day-of-month month day-of-week)."
+	groups := []*huh.Group{
+		buildNameStep(&name, &workingDir),
+		buildScheduleStep(&presetKey, scheduleDesc),
+		buildPromptStep(&prompt),
+		buildModelEffortStep(&model, &effort),
+		buildToolsStep(&allowedTools, toolOptions),
+		buildTimeoutRetryStep(&timeout, &maxRetries, &retryBackoff, &summaryEnabled),
+	}
 	if len(onSuccessOptions) > 0 {
-		step8 := huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("🔗 On Success: Chain To Jobs").
-				Description("Jobs to run automatically when this job completes successfully.\nUseful for multi-step workflows (leave empty to skip).").
-				Options(onSuccessOptions...).
-				Value(&onSuccess),
-		)
-		groups = append(groups, step8)
+		groups = append(groups, buildOnSuccessStep(&onSuccess, onSuccessOptions))
 	}
 
-	form := huh.NewForm(groups...).
-		WithTheme(theme)
-
+	form := huh.NewForm(groups...).WithTheme(theme)
 	if err := form.Run(); err != nil {
 		if IsAborted(err) {
 			return nil, nil
@@ -248,39 +277,26 @@ func RunAddWizard() (*WizardResult, error) {
 		return nil, err
 	}
 
-	// Handle custom cron
-	if presetKey == "custom" {
-		var customCron string
-		customForm := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("✏️  Custom Cron Expression").
-					Description("Standard 5-field cron: minute hour day-of-month month day-of-week\n" +
-						"Examples: */30 * * * * (every 30 min), 0 9,17 * * 1-5 (9am & 5pm weekdays)").
-					Placeholder("*/30 * * * *").
-					Value(&customCron).
-					Validate(ui.ValidateCron),
-			),
-		).WithTheme(theme)
-
-		if err := customForm.Run(); err != nil {
-			if IsAborted(err) {
-				return nil, nil
-			}
-			return nil, err
+	// Handle custom cron expression.
+	schedule, err := runCustomCronForm(presetKey, "*/30 * * * *",
+		"Standard 5-field cron: minute hour day-of-month month day-of-week\n"+
+			"Examples: */30 * * * * (every 30 min), 0 9,17 * * 1-5 (9am & 5pm weekdays)")
+	if err != nil {
+		return nil, err
+	}
+	if schedule == "" {
+		if presetKey == "custom" {
+			return nil, nil // aborted in custom cron form
 		}
-		schedule = customCron
-	} else {
 		schedule = presetKey
 	}
 
-	// Normalize effort: "high" is the default, omit it from config
+	// Normalize effort: "high" is the default, omit it from config.
 	effortVal := effort
 	if effortVal == "high" {
 		effortVal = ""
 	}
 
-	// Build job config
 	job := &config.JobConfig{
 		ID:               uuid.New().String()[:8],
 		Name:             name,
@@ -307,7 +323,6 @@ func RunAddWizard() (*WizardResult, error) {
 
 // RunEditWizard runs the edit wizard for an existing job.
 func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult, error) {
-	var schedule string
 	presetKey := job.Schedule
 	prompt := existingPrompt
 	model := job.Model
@@ -329,18 +344,26 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		retryBackoff = "exponential"
 	}
 
-	// Build set of currently disallowed tools to invert for the "allowed" UI
+	// Build tool options: pre-select tools NOT in the disallowed list.
 	disabledSet := make(map[string]bool)
 	for _, t := range job.DisallowedTools {
 		disabledSet[t] = true
 	}
 	var allowedTools []string
+	var toolOptions []huh.Option[string]
+	for _, t := range claudeCodeTools {
+		opt := huh.NewOption(t.Label, t.Name)
+		if !disabledSet[t.Name] {
+			opt = opt.Selected(true)
+		}
+		toolOptions = append(toolOptions, opt)
+	}
 
 	fmt.Println(ui.Title.MarginBottom(1).Render(fmt.Sprintf("  ✏️  Edit Job: %s", job.Name)))
 
-	// Check if current schedule matches a preset
-	isPreset := false
+	// Determine if the current schedule matches a preset; if not, show custom.
 	presets := []string{"0 * * * *", "0 */6 * * *", "0 2 * * *", "0 9 * * *", "0 9 * * 1"}
+	isPreset := false
 	for _, p := range presets {
 		if job.Schedule == p {
 			isPreset = true
@@ -351,124 +374,15 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		presetKey = "custom"
 	}
 
-	step1 := huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("⏰ Schedule").
-			Description(fmt.Sprintf("Current: %s", job.Schedule)).
-			Options(
-				huh.NewOption("🔄 Every hour", "0 * * * *"),
-				huh.NewOption("🔄 Every 6 hours", "0 */6 * * *"),
-				huh.NewOption("🌙 Daily at 2 AM", "0 2 * * *"),
-				huh.NewOption("☀️  Daily at 9 AM", "0 9 * * *"),
-				huh.NewOption("📅 Weekly (Monday 9 AM)", "0 9 * * 1"),
-				huh.NewOption("✏️  Custom cron expression", "custom"),
-			).
-			Value(&presetKey),
-	)
-
-	step2 := huh.NewGroup(
-		huh.NewText().
-			Title("📝 Prompt").
-			Description("Edit the prompt. Be specific about the task, expected output, and constraints.").
-			CharLimit(5000).
-			Lines(6).
-			Value(&prompt).
-			Validate(ui.ValidateNonEmpty),
-	)
-
-	step3 := huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("🧠 Model").
-			Options(
-				huh.NewOption("⚡ Sonnet — fast, capable, cost-effective (recommended)", "sonnet"),
-				huh.NewOption("🧠 Opus — most capable, best for complex reasoning", "opus"),
-				huh.NewOption("🐇 Haiku — fastest, cheapest, good for simple tasks", "haiku"),
-			).
-			Value(&model),
-	)
-
-	step4 := huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("💪 Effort Level").
-			Description("Controls thinking effort. Higher = better results but more tokens.").
-			Options(
-				huh.NewOption("🔥 High — full capability, default (recommended)", "high"),
-				huh.NewOption("⚖️  Medium — balanced speed and cost", "medium"),
-				huh.NewOption("💨 Low — most token-efficient, good for simple tasks", "low"),
-				huh.NewOption("💎 Max — absolute maximum capability (Opus only)", "max"),
-			).
-			Value(&effort),
-	)
-
-	// Step 5: Allowed Tools — pre-select tools NOT in the disallowed list
-	var toolOptions []huh.Option[string]
-	for _, t := range claudeCodeTools {
-		opt := huh.NewOption(t.Label, t.Name)
-		if !disabledSet[t.Name] {
-			opt = opt.Selected(true)
-		}
-		toolOptions = append(toolOptions, opt)
-	}
-	step5 := huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("🔧 Allowed Tools").
-			Description("Selected tools will be AVAILABLE during job execution. Deselect to deny.").
-			Options(toolOptions...).
-			Value(&allowedTools).
-			Validate(func(t []string) error {
-				if len(t) == 0 {
-					return fmt.Errorf("at least one tool must be allowed")
-				}
-				return nil
-			}),
-	)
-
-	// Step 6: Timeout, Summary & Retry
-	step6 := huh.NewGroup(
-		huh.NewInput().
-			Title("⏱️  Timeout (seconds)").
-			Description("Quick: 60-120s. Standard: 300s. Complex: 600-900s. Default: 300.").
-			Placeholder("300").
-			Value(&timeout),
-		huh.NewConfirm().
-			Title("📊 Enable Report Summarization").
-			Description("Generates a short Telegram-style summary after each run.\n"+
-				"Summary is sent directly to Telegram as the job output.").
-			Value(&summaryEnabled),
-		huh.NewInput().
-			Title("🔁 Max Retries").
-			Description("How many times to retry on failure (0 = no retry, max 10). Exponential backoff: 30s→60s→120s…").
-			Placeholder("0").
-			Value(&maxRetries).
-			Validate(func(s string) error {
-				if s == "" {
-					return nil
-				}
-				n, err := strconv.Atoi(strings.TrimSpace(s))
-				if err != nil || n < 0 || n > 10 {
-					return fmt.Errorf("must be an integer between 0 and 10")
-				}
-				return nil
-			}),
-		huh.NewSelect[string]().
-			Title("📈 Retry Backoff").
-			Description("Delay strategy between retries.").
-			Options(
-				huh.NewOption("📈 Exponential — 30s, 60s, 120s… (recommended)", "exponential"),
-				huh.NewOption("📏 Linear — 30s, 60s, 90s…", "linear"),
-			).
-			Value(&retryBackoff),
-	)
-
-	// Step 7 (optional): On Success — chain to other jobs (exclude self)
+	// Build on-success options, excluding self and disabled jobs.
 	onSuccess := make([]string, len(job.OnSuccess))
 	copy(onSuccess, job.OnSuccess)
-	existingJobs, _ := config.LoadAllJobs(platform.SchedulesDir())
-	var onSuccessOptions []huh.Option[string]
 	currentOnSuccess := make(map[string]bool)
 	for _, n := range job.OnSuccess {
 		currentOnSuccess[n] = true
 	}
+	existingJobs, _ := config.LoadAllJobs(platform.SchedulesDir())
+	var onSuccessOptions []huh.Option[string]
 	for _, j := range existingJobs {
 		if j.Name == job.Name || !j.Enabled {
 			continue
@@ -480,34 +394,30 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		onSuccessOptions = append(onSuccessOptions, opt)
 	}
 
-	// keepChain is only consulted when all chain targets are unavailable (disabled/removed).
-	// true = preserve existing on_success list, false = clear it.
+	// keepChain is only consulted when all chain targets are unavailable.
 	keepChain := true
-	editGroups := []*huh.Group{step1, step2, step3, step4, step5, step6}
+	editGroups := []*huh.Group{
+		buildScheduleStep(&presetKey, fmt.Sprintf("Current: %s", job.Schedule)),
+		buildPromptStep(&prompt),
+		buildModelEffortStep(&model, &effort),
+		buildToolsStep(&allowedTools, toolOptions),
+		buildTimeoutRetryStep(&timeout, &maxRetries, &retryBackoff, &summaryEnabled),
+	}
 	if len(onSuccessOptions) > 0 {
-		step7 := huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("🔗 On Success: Chain To Jobs").
-				Description("Jobs to run automatically when this job completes successfully.\nLeave empty to disable chaining.").
-				Options(onSuccessOptions...).
-				Value(&onSuccess),
-		)
-		editGroups = append(editGroups, step7)
+		editGroups = append(editGroups, buildOnSuccessStep(&onSuccess, onSuccessOptions))
 	} else if len(job.OnSuccess) > 0 {
 		// All target jobs are disabled/removed; let the user decide whether to clear the chain.
-		step7 := huh.NewGroup(
+		step := huh.NewGroup(
 			huh.NewConfirm().
 				Title("🔗 On Success: Chain Targets Unavailable").
 				Description(fmt.Sprintf("This job chains to: %s\nNone of these jobs are currently enabled. Keep the chain configuration?",
 					strings.Join(job.OnSuccess, ", "))).
 				Value(&keepChain),
 		)
-		editGroups = append(editGroups, step7)
+		editGroups = append(editGroups, step)
 	}
 
-	form := huh.NewForm(editGroups...).
-		WithTheme(theme)
-
+	form := huh.NewForm(editGroups...).WithTheme(theme)
 	if err := form.Run(); err != nil {
 		if IsAborted(err) {
 			return nil, nil
@@ -515,38 +425,25 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		return nil, err
 	}
 
-	// Handle custom cron
-	if presetKey == "custom" {
-		customCron := job.Schedule
-		customForm := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("✏️  Custom Cron Expression").
-					Description("5-field cron: minute hour day-of-month month day-of-week").
-					Placeholder(job.Schedule).
-					Value(&customCron).
-					Validate(ui.ValidateCron),
-			),
-		).WithTheme(theme)
-
-		if err := customForm.Run(); err != nil {
-			if IsAborted(err) {
-				return nil, nil
-			}
-			return nil, err
+	// Handle custom cron expression.
+	schedule, err := runCustomCronForm(presetKey, job.Schedule, "5-field cron: minute hour day-of-month month day-of-week")
+	if err != nil {
+		return nil, err
+	}
+	if schedule == "" {
+		if presetKey == "custom" {
+			return nil, nil // aborted in custom cron form
 		}
-		schedule = customCron
-	} else {
 		schedule = presetKey
 	}
 
-	// Normalize effort: "high" is the default, omit it from config
+	// Normalize effort: "high" is the default, omit it from config.
 	effortVal := effort
 	if effortVal == "high" {
 		effortVal = ""
 	}
 
-	// Compute disallowed from allowed selection, preserving custom patterns from YAML
+	// Compute disallowed from allowed selection, preserving custom patterns from YAML.
 	disallowed := computeDisallowedTools(allowedTools)
 	knownToolNames := make(map[string]bool)
 	for _, t := range claudeCodeTools {
@@ -563,7 +460,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		onSuccess = nil
 	}
 
-	// Update job config (keep ID, Name, WorkingDir, PromptFile)
+	// Update job config (keep ID, Name, WorkingDir, PromptFile).
 	job.Schedule = schedule
 	job.Model = model
 	job.Effort = effortVal
@@ -580,13 +477,43 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	}, nil
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// runCustomCronForm shows an input form for a custom cron expression when
+// presetKey == "custom". Returns the entered cron string, or "" if aborted or
+// presetKey is not "custom".
+func runCustomCronForm(presetKey, initialValue, description string) (string, error) {
+	if presetKey != "custom" {
+		return "", nil
+	}
+	customCron := initialValue
+	customForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("✏️  Custom Cron Expression").
+				Description(description).
+				Placeholder("*/30 * * * *").
+				Value(&customCron).
+				Validate(ui.ValidateCron),
+		),
+	).WithTheme(theme)
+
+	if err := customForm.Run(); err != nil {
+		if IsAborted(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return customCron, nil
+}
+
 func parseInt(s string, defaultVal int) int {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return defaultVal
 	}
 	i, err := strconv.Atoi(s)
-	if err != nil || i <= 0 {
+	if err != nil {
 		return defaultVal
 	}
 	return i
@@ -616,14 +543,14 @@ func nilIfEmpty(s []string) []string {
 }
 
 // retryBackoffValue returns the backoff strategy to store in config.
-// Returns "" when no retries are configured (n=0) or when the strategy is
-// "exponential" (the default), keeping the YAML clean.
+// Returns config.BackoffExponential ("") when no retries are configured or
+// when the strategy is exponential (the default), keeping the YAML clean.
 func retryBackoffValue(maxRetriesStr, backoff string) string {
 	if parseInt(maxRetriesStr, 0) == 0 {
-		return ""
+		return config.BackoffExponential
 	}
-	if backoff == "exponential" {
-		return "" // exponential is the default; omit for clean YAML
+	if backoff == config.BackoffLinear {
+		return config.BackoffLinear
 	}
-	return backoff
+	return config.BackoffExponential
 }

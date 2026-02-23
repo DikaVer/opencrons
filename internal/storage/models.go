@@ -51,6 +51,22 @@ type ChatSession struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// LogUpdate holds the fields for updating a completed execution log entry.
+// Using a struct instead of 11 positional parameters prevents argument mis-ordering.
+type LogUpdate struct {
+	FinishedAt          time.Time
+	ExitCode            int
+	StdoutPath          string
+	StderrPath          string
+	CostUSD             float64
+	InputTokens         int
+	OutputTokens        int
+	CacheReadTokens     int
+	CacheCreationTokens int
+	Status              string
+	ErrorMsg            string
+}
+
 // ChatMessage represents a logged chat message for visibility.
 type ChatMessage struct {
 	ID        int64     `json:"id"`

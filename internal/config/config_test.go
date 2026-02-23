@@ -434,7 +434,7 @@ func TestJobConfig_Validate_RetryFields(t *testing.T) {
 	}{
 		{"no retries (default)", 0, "", false, ""},
 		{"valid retries + empty backoff", 3, "", false, ""},
-		{"valid retries + exponential", 5, "exponential", false, ""},
+		{"valid retries + exponential (stored as empty)", 5, "", false, ""},
 		{"valid retries + linear", 2, "linear", false, ""},
 		{"max boundary", 10, "", false, ""},
 		{"too many retries", 11, "", true, "max_retries"},

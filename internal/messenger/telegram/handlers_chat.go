@@ -1,10 +1,12 @@
-// chat.go handles free-text Telegram messages as Claude conversations.
+// handlers_chat.go implements Telegram handlers for chat session management.
 //
 // SetChatComponents injects the session manager and runner after bot creation.
-// handleChatMessage acquires a per-user lock, gets or creates a session,
-// sends typing indicators, runs "claude -p" with --session-id (new) or
-// --resume (existing), logs the exchange to the database, sends the response
-// to Telegram, and echoes a summary to the terminal.
+// handleNew clears the current session so the next message starts fresh.
+// handleStopQuery cancels an in-flight Claude query via the stored cancel func.
+// handleChatMessage is the main free-text handler: acquires a per-user lock,
+// gets or creates a session, sends typing indicators, runs "claude -p" with
+// --session-id (new) or --resume (existing), logs the exchange to the database,
+// and sends the response to Telegram.
 // sendTypingLoop refreshes the typing indicator every 5 seconds.
 package telegram
 
@@ -26,6 +28,38 @@ import (
 func (b *Bot) SetChatComponents(sm *chat.SessionManager, runner *chat.Runner) {
 	b.sessionMgr = sm
 	b.chatRunner = runner
+}
+
+func (b *Bot) handleNew(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	userID := update.Message.From.ID
+	chatID := update.Message.Chat.ID
+
+	// Deactivate existing sessions via session manager
+	if b.sessionMgr != nil {
+		if err := b.sessionMgr.ClearSession(userID); err != nil {
+			slogger.Warn("error clearing session", "userID", userID, "err", err)
+		}
+	} else if err := b.db.DeactivateUserSessions(userID); err != nil {
+		slogger.Warn("error deactivating sessions", "userID", userID, "err", err)
+	}
+
+	_ = b.SendPlain(ctx, chatID, "Session cleared. Send a message to start a fresh conversation with Claude.")
+	b.stdlog.Printf("[telegram] User %d started new session", userID)
+}
+
+func (b *Bot) handleStopQuery(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	userID := update.Message.From.ID
+	chatID := update.Message.Chat.ID
+
+	cancelVal, ok := b.cancels.Load(userID)
+	if !ok {
+		_ = b.SendPlain(ctx, chatID, "No active query to stop.")
+		return
+	}
+
+	cancelFunc := cancelVal.(context.CancelFunc)
+	cancelFunc()
+	b.stdlog.Printf("[telegram] User %d stopped active query", userID)
 }
 
 // handleChatMessage processes a regular text message as a chat with Claude.
@@ -130,10 +164,8 @@ func (b *Bot) handleChatMessage(ctx context.Context, tgBot *bot.Bot, update *mod
 		slogger.Warn("chat log write failed", "sessionID", session.ID, "role", "assistant", "err", err)
 	}
 
-	// Send response to Telegram
-	// Try markdown first, fall back to plain text if it fails
+	// Send response to Telegram; fall back to plain text if HTML parsing fails.
 	if err := b.Send(ctx, chatID, result.Response); err != nil {
-		// Markdown parsing may fail for certain responses, try plain text
 		_ = b.SendPlain(ctx, chatID, result.Response)
 	}
 

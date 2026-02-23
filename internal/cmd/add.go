@@ -136,9 +136,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	disallowedTools, _ := cmd.Flags().GetStringArray("disallowed-tools")
 	maxRetries, _ := cmd.Flags().GetInt("max-retries")
 	retryBackoff, _ := cmd.Flags().GetString("retry-backoff")
-	// "exponential" is the default; omit from config for clean YAML
+	// BackoffExponential ("") is the default; omit from config for clean YAML.
 	if retryBackoff == "exponential" {
-		retryBackoff = ""
+		retryBackoff = config.BackoffExponential
 	}
 	onSuccess, _ := cmd.Flags().GetStringArray("on-success")
 
@@ -200,9 +200,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 	}
 
 	// Verify on-success targets exist at creation time
-	for _, name := range onSuccess {
-		if !config.JobNameExists(platform.SchedulesDir(), name) {
-			return fmt.Errorf("--on-success references unknown job %q", name)
+	for _, target := range onSuccess {
+		if !config.JobNameExists(platform.SchedulesDir(), target) {
+			return fmt.Errorf("--on-success references unknown job %q", target)
 		}
 	}
 

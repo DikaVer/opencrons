@@ -9,6 +9,7 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DikaVer/opencrons/internal/logger"
@@ -60,7 +61,7 @@ func (db *DB) migrate() error {
 		status       TEXT NOT NULL DEFAULT 'running'
 		             CHECK (status IN ('running','success','failed','timeout','cancelled')),
 		trigger_type TEXT NOT NULL DEFAULT 'scheduled'
-		             CHECK (trigger_type IN ('scheduled','manual')),
+		             CHECK (trigger_type IN ('scheduled','manual','on_success')),
 		error_msg    TEXT DEFAULT ''
 	);
 
@@ -82,6 +83,12 @@ func (db *DB) migrate() error {
 	for _, m := range migrations {
 		// Ignore "duplicate column" errors — column already exists
 		_, _ = db.conn.Exec(m)
+	}
+
+	// Migration: broaden trigger_type CHECK constraint to include 'on_success'.
+	// Needed for existing databases created before job chaining was introduced.
+	if err := db.migrateTriggerTypeConstraint(); err != nil {
+		return fmt.Errorf("migrating trigger_type constraint: %w", err)
 	}
 
 	// Chat sessions and messages tables
@@ -132,7 +139,7 @@ func (db *DB) InsertLog(entry *ExecutionLog) (int64, error) {
 }
 
 // UpdateLog updates an existing execution log entry with results and usage data.
-func (db *DB) UpdateLog(id int64, finishedAt time.Time, exitCode int, stdoutPath, stderrPath string, costUSD float64, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int, status, errorMsg string) error {
+func (db *DB) UpdateLog(id int64, u LogUpdate) error {
 	_, err := db.conn.Exec(
 		`UPDATE execution_logs SET
 			finished_at = ?, exit_code = ?, stdout_path = ?, stderr_path = ?,
@@ -140,10 +147,10 @@ func (db *DB) UpdateLog(id int64, finishedAt time.Time, exitCode int, stdoutPath
 			cache_read_tokens = ?, cache_creation_tokens = ?,
 			status = ?, error_msg = ?
 		 WHERE id = ?`,
-		finishedAt, exitCode, stdoutPath, stderrPath,
-		costUSD, inputTokens, outputTokens,
-		cacheReadTokens, cacheCreationTokens,
-		status, errorMsg, id,
+		u.FinishedAt, u.ExitCode, u.StdoutPath, u.StderrPath,
+		u.CostUSD, u.InputTokens, u.OutputTokens,
+		u.CacheReadTokens, u.CacheCreationTokens,
+		u.Status, u.ErrorMsg, id,
 	)
 	if err != nil {
 		return fmt.Errorf("updating log: %w", err)
@@ -435,6 +442,72 @@ func (db *DB) DeactivateStaleSessions(maxIdle time.Duration) (int64, error) {
 	n, _ := result.RowsAffected()
 	log.Debug("stale sessions deactivated", "count", n, "maxIdle", maxIdle)
 	return n, nil
+}
+
+// migrateTriggerTypeConstraint recreates execution_logs with an updated CHECK
+// constraint that allows 'on_success' as a trigger_type value (for job chaining).
+// It is a no-op if the constraint already includes 'on_success'.
+func (db *DB) migrateTriggerTypeConstraint() error {
+	var schemaSQL string
+	err := db.conn.QueryRow(
+		`SELECT sql FROM sqlite_master WHERE type='table' AND name='execution_logs'`,
+	).Scan(&schemaSQL)
+	if err != nil {
+		return fmt.Errorf("reading schema: %w", err)
+	}
+	if strings.Contains(schemaSQL, "'on_success'") {
+		return nil // already up to date
+	}
+
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("starting transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	steps := []string{
+		`CREATE TABLE execution_logs_new (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			job_id       TEXT NOT NULL,
+			job_name     TEXT NOT NULL,
+			started_at   DATETIME NOT NULL,
+			finished_at  DATETIME,
+			exit_code    INTEGER,
+			stdout_path  TEXT DEFAULT '',
+			stderr_path  TEXT DEFAULT '',
+			cost_usd     REAL,
+			tokens_used  INTEGER,
+			status       TEXT NOT NULL DEFAULT 'running'
+			             CHECK (status IN ('running','success','failed','timeout','cancelled')),
+			trigger_type TEXT NOT NULL DEFAULT 'scheduled'
+			             CHECK (trigger_type IN ('scheduled','manual','on_success')),
+			error_msg    TEXT DEFAULT '',
+			input_tokens INTEGER,
+			output_tokens INTEGER,
+			cache_read_tokens INTEGER,
+			cache_creation_tokens INTEGER,
+			retry_attempt INTEGER DEFAULT 0
+		)`,
+		`INSERT INTO execution_logs_new SELECT
+			id, job_id, job_name, started_at, finished_at, exit_code,
+			stdout_path, stderr_path, cost_usd, tokens_used, status, trigger_type,
+			error_msg, input_tokens, output_tokens, cache_read_tokens,
+			cache_creation_tokens, COALESCE(retry_attempt, 0)
+		 FROM execution_logs`,
+		`DROP TABLE execution_logs`,
+		`ALTER TABLE execution_logs_new RENAME TO execution_logs`,
+		`CREATE INDEX IF NOT EXISTS idx_logs_job_id ON execution_logs(job_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_logs_started_at ON execution_logs(started_at)`,
+	}
+
+	for _, step := range steps {
+		if _, err := tx.Exec(step); err != nil {
+			return fmt.Errorf("migration step: %w", err)
+		}
+	}
+
+	log.Info("migrated trigger_type constraint to include 'on_success'")
+	return tx.Commit()
 }
 
 func scanLogs(rows *sql.Rows) ([]ExecutionLog, error) {

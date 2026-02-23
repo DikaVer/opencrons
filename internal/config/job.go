@@ -14,6 +14,13 @@ import (
 	"github.com/DikaVer/opencrons/internal/ui"
 )
 
+// Retry backoff strategy constants. BackoffExponential is the empty string
+// (the default) so it is omitted from YAML for cleanliness.
+const (
+	BackoffExponential = ""       // default; stored as empty string in YAML
+	BackoffLinear      = "linear"
+)
+
 // JobConfig represents a single scheduled job configuration.
 type JobConfig struct {
 	ID               string `yaml:"id"`
@@ -28,7 +35,7 @@ type JobConfig struct {
 	SummaryEnabled   bool     `yaml:"summary_enabled,omitempty"`
 	NoSessionPersist bool     `yaml:"no_session_persistence,omitempty"`
 	MaxRetries       int      `yaml:"max_retries,omitempty"`   // 0 = no retries (default)
-	RetryBackoff     string   `yaml:"retry_backoff,omitempty"` // "exponential" (default) or "linear"
+	RetryBackoff     string   `yaml:"retry_backoff,omitempty"` // "" (exponential, default) or "linear"
 	Enabled          bool     `yaml:"enabled"`
 	// OnSuccess lists job names to run automatically when this job completes successfully.
 	OnSuccess []string `yaml:"on_success,omitempty"`
@@ -90,8 +97,8 @@ func (j *JobConfig) Validate() error {
 	if j.MaxRetries < 0 || j.MaxRetries > 10 {
 		return fmt.Errorf("job %q: max_retries must be between 0 and 10", j.Name)
 	}
-	// "" is the canonical sentinel for "exponential" (the default); omitted from YAML for cleanliness.
-	if j.RetryBackoff != "" && j.RetryBackoff != "exponential" && j.RetryBackoff != "linear" {
+	// BackoffExponential ("") is the canonical default; omitted from YAML for cleanliness.
+	if j.RetryBackoff != BackoffExponential && j.RetryBackoff != BackoffLinear {
 		return fmt.Errorf("job %q: retry_backoff must be \"exponential\" or \"linear\"", j.Name)
 	}
 

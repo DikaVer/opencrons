@@ -67,8 +67,11 @@ func TestInsertLog_UpdateLog_GetLogs(t *testing.T) {
 
 	// Update the log
 	now := time.Now()
-	err = db.UpdateLog(id, now, 0, "/stdout.json", "/stderr.log",
-		0.05, 1000, 500, 200, 100, "success", "")
+	err = db.UpdateLog(id, LogUpdate{
+		FinishedAt: now, StdoutPath: "/stdout.json", StderrPath: "/stderr.log",
+		CostUSD: 0.05, InputTokens: 1000, OutputTokens: 500, CacheReadTokens: 200, CacheCreationTokens: 100,
+		Status: "success",
+	})
 	if err != nil {
 		t.Fatalf("UpdateLog: %v", err)
 	}
@@ -105,7 +108,7 @@ func TestInsertLog_RetryAttempt(t *testing.T) {
 		if attempt == 2 {
 			status = "success"
 		}
-		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), Status: status}); err != nil {
 			t.Fatalf("UpdateLog attempt %d: %v", attempt, err)
 		}
 	}
@@ -148,7 +151,7 @@ func TestGetRecentLogs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0, 0, 0, 0, 0, "success", ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), Status: "success"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -175,7 +178,7 @@ func TestGetUsageByJobName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0.10, 100, 50, 0, 0, "success", ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), CostUSD: 0.10, InputTokens: 100, OutputTokens: 50, Status: "success"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -201,7 +204,7 @@ func TestGetTotalUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.UpdateLog(id, time.Now(), 0, "", "", 0.05, 50, 25, 0, 0, "success", ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), CostUSD: 0.05, InputTokens: 50, OutputTokens: 25, Status: "success"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -422,7 +425,7 @@ func TestGetFailedLogs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), ExitCode: 1, Status: status}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -457,7 +460,7 @@ func TestGetFailedLogsByJobName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, status, ""); err != nil {
+		if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), ExitCode: 1, Status: status}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -467,7 +470,7 @@ func TestGetFailedLogsByJobName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.UpdateLog(id, time.Now(), 1, "", "", 0, 0, 0, 0, 0, "timeout", ""); err != nil {
+	if err := db.UpdateLog(id, LogUpdate{FinishedAt: time.Now(), ExitCode: 1, Status: "timeout"}); err != nil {
 		t.Fatal(err)
 	}
 

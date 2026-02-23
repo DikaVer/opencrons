@@ -57,7 +57,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Running job %q...\n", name)
 
-	result, err := executor.Run(ctx, db, job, "manual", 0)
+	result, err := executor.Run(ctx, db, job, executor.TriggerManual, 0)
 	if err != nil {
 		return fmt.Errorf("execution failed: %w", err)
 	}
@@ -80,23 +80,30 @@ func runRun(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Error:    %s\n", result.ErrorMsg)
 	}
 
-	// Send output to Telegram if summary is enabled and output is available
-	if job.SummaryEnabled && result.Output != "" {
-		msgCfg := platform.GetMessengerConfig()
-		if msgCfg != nil && msgCfg.Type == "telegram" {
-			tgBot, err := telegram.New(db, msgCfg, log.New(os.Stderr, "", 0))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Telegram notification failed: %v\n", err)
-			} else {
-				tgBot.NotifyJobComplete(ctx, job.Name, result.Status, result.Output)
-				fmt.Println("Summary sent to Telegram.")
-			}
-		}
-	}
+	sendSummaryToTelegram(ctx, db, job, result)
 
 	if result.Status != "success" {
 		os.Exit(1)
 	}
 
 	return nil
+}
+
+// sendSummaryToTelegram delivers a job result summary via Telegram.
+// It is a no-op if summary is disabled, output is empty, or Telegram is not configured.
+func sendSummaryToTelegram(ctx context.Context, db *storage.DB, job *config.JobConfig, result *executor.Result) {
+	if !job.SummaryEnabled || result.Output == "" {
+		return
+	}
+	msgCfg := platform.GetMessengerConfig()
+	if msgCfg == nil || msgCfg.Type != "telegram" {
+		return
+	}
+	tgBot, err := telegram.New(db, msgCfg, log.New(os.Stderr, "", 0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Telegram notification failed: %v\n", err)
+		return
+	}
+	tgBot.NotifyJobComplete(ctx, job.Name, result.Status, result.Output)
+	fmt.Println("Summary sent to Telegram.")
 }

@@ -19,6 +19,12 @@ import (
 
 var log = logger.New("config")
 
+// Config file extension constants used when probing for job config files.
+const (
+	configExtYML  = ".yml"
+	configExtYAML = ".yaml"
+)
+
 // normalizeWorkingDir fixes bare Windows drive letters ("D:" → "D:\").
 // On Windows, "D:" means "current directory on drive D", not the drive root.
 // YAML round-tripping can strip the trailing backslash, so we restore it here.
@@ -65,7 +71,7 @@ func LoadAllJobs(schedulesDir string) ([]*JobConfig, error) {
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".yml") && !strings.HasSuffix(name, ".yaml") {
+		if !strings.HasSuffix(name, configExtYML) && !strings.HasSuffix(name, configExtYAML) {
 			continue
 		}
 
@@ -147,10 +153,10 @@ func DeleteJob(schedulesDir, promptsDir, jobName string, deletePrompt bool) erro
 		}
 	}
 
-	configPath := filepath.Join(schedulesDir, jobName+".yml")
+	configPath := filepath.Join(schedulesDir, jobName+configExtYML)
 	if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 		// Try .yaml extension
-		configPath = filepath.Join(schedulesDir, jobName+".yaml")
+		configPath = filepath.Join(schedulesDir, jobName+configExtYAML)
 		if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("removing job config: %w", err)
 		}
@@ -167,20 +173,25 @@ func DeleteJob(schedulesDir, promptsDir, jobName string, deletePrompt bool) erro
 	return nil
 }
 
+// jobConfigPath returns the path of the first existing config file for name,
+// checking configExtYML then configExtYAML. Returns ("", false) if neither exists.
+func jobConfigPath(schedulesDir, name string) (string, bool) {
+	for _, ext := range []string{configExtYML, configExtYAML} {
+		p := filepath.Join(schedulesDir, name+ext)
+		if _, err := os.Stat(p); err == nil {
+			return p, true
+		}
+	}
+	return "", false
+}
+
 // JobNameExists checks if a job with the given name already exists.
 func JobNameExists(schedulesDir, name string) bool {
 	if validateJobName(name) != nil {
 		return false
 	}
-	path := filepath.Join(schedulesDir, name+".yml")
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	path = filepath.Join(schedulesDir, name+".yaml")
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	return false
+	_, ok := jobConfigPath(schedulesDir, name)
+	return ok
 }
 
 // FindJobByName loads a specific job config by name.
@@ -188,20 +199,9 @@ func FindJobByName(schedulesDir, name string) (*JobConfig, error) {
 	if err := validateJobName(name); err != nil {
 		return nil, err
 	}
-
-	path := filepath.Join(schedulesDir, name+".yml")
-	if _, err := os.Stat(path); err == nil {
-		return LoadJob(path)
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("checking job config %s: %w", path, err)
+	path, ok := jobConfigPath(schedulesDir, name)
+	if !ok {
+		return nil, fmt.Errorf("job %q not found", name)
 	}
-
-	path = filepath.Join(schedulesDir, name+".yaml")
-	if _, err := os.Stat(path); err == nil {
-		return LoadJob(path)
-	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("checking job config %s: %w", path, err)
-	}
-
-	return nil, fmt.Errorf("job %q not found", name)
+	return LoadJob(path)
 }

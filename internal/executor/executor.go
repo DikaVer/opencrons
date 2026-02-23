@@ -26,6 +26,13 @@ import (
 
 var log = logger.New("executor")
 
+// Trigger type constants for execution log entries.
+const (
+	TriggerScheduled = "scheduled"
+	TriggerManual    = "manual"
+	TriggerOnSuccess = "on_success"
+)
+
 // effectiveWorkingDir returns the working directory to use for a job.
 // When job.WorkingDir is empty the job uses its managed project folder
 // (platform.ProjectDir(job.Name)), which is created lazily on first run.
@@ -109,6 +116,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	// Set up output capture files
 	if err := os.MkdirAll(platform.LogsDir(), 0755); err != nil {
+		_ = db.UpdateLog(logID, storage.LogUpdate{FinishedAt: time.Now(), ExitCode: -1, Status: "failed", ErrorMsg: err.Error()})
 		return nil, fmt.Errorf("creating logs directory: %w", err)
 	}
 
@@ -117,12 +125,14 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	stdoutFile, err := os.Create(stdoutPath)
 	if err != nil {
+		_ = db.UpdateLog(logID, storage.LogUpdate{FinishedAt: time.Now(), ExitCode: -1, Status: "failed", ErrorMsg: err.Error()})
 		return nil, fmt.Errorf("creating stdout file: %w", err)
 	}
 
 	stderrFile, err := os.Create(stderrPath)
 	if err != nil {
 		_ = stdoutFile.Close()
+		_ = db.UpdateLog(logID, storage.LogUpdate{FinishedAt: time.Now(), ExitCode: -1, StdoutPath: stdoutPath, Status: "failed", ErrorMsg: err.Error()})
 		return nil, fmt.Errorf("creating stderr file: %w", err)
 	}
 
@@ -141,7 +151,7 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 			Status:   "failed",
 			ErrorMsg: err.Error(),
 		}
-		if updateErr := db.UpdateLog(logID, time.Now(), -1, stdoutPath, stderrPath, 0, 0, 0, 0, 0, "failed", err.Error()); updateErr != nil {
+		if updateErr := db.UpdateLog(logID, storage.LogUpdate{FinishedAt: time.Now(), ExitCode: -1, StdoutPath: stdoutPath, StderrPath: stderrPath, Status: "failed", ErrorMsg: err.Error()}); updateErr != nil {
 			log.Error("failed to update log", "logID", logID, "job", job.Name, "err", updateErr)
 		}
 		return result, nil
@@ -191,10 +201,19 @@ func Run(ctx context.Context, db *storage.DB, job *config.JobConfig, triggerType
 
 	// Update log
 	finishedAt := time.Now()
-	if updateErr := db.UpdateLog(logID, finishedAt, result.ExitCode, stdoutPath, stderrPath,
-		result.CostUSD, result.InputTokens, result.OutputTokens,
-		result.CacheReadTokens, result.CacheCreationTokens,
-		result.Status, result.ErrorMsg); updateErr != nil {
+	if updateErr := db.UpdateLog(logID, storage.LogUpdate{
+		FinishedAt:          finishedAt,
+		ExitCode:            result.ExitCode,
+		StdoutPath:          stdoutPath,
+		StderrPath:          stderrPath,
+		CostUSD:             result.CostUSD,
+		InputTokens:         result.InputTokens,
+		OutputTokens:        result.OutputTokens,
+		CacheReadTokens:     result.CacheReadTokens,
+		CacheCreationTokens: result.CacheCreationTokens,
+		Status:              result.Status,
+		ErrorMsg:            result.ErrorMsg,
+	}); updateErr != nil {
 		log.Error("failed to finalize log", "logID", logID, "job", job.Name, "err", updateErr)
 	}
 

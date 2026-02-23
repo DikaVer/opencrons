@@ -217,41 +217,15 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		maxAttempts := 1 + j.MaxRetries
-		var result *executor.Result
-		var runErr error
-
-		for attempt := 0; attempt < maxAttempts; attempt++ {
-			if attempt > 0 {
-				delay := retryDelay(j.RetryBackoff, attempt-1)
-				d.logger.Printf("Job %q retrying in %s (attempt %d/%d)", j.Name, delay, attempt+1, maxAttempts)
-				slogger.Info("job retry scheduled", "name", j.Name, "attempt", attempt+1, "delay", delay)
-				select {
-				case <-time.After(delay):
-				case <-ctx.Done():
-					return
-				}
+		result, runErr := d.runJobWithRetry(ctx, j, executor.TriggerScheduled)
+		if runErr != nil {
+			if bot := d.tgBot.Load(); bot != nil {
+				bot.NotifyJobComplete(ctx, j.Name, "failed", fmt.Sprintf("infrastructure error: %s", runErr.Error()))
 			}
-
-			result, runErr = executor.Run(ctx, d.db, j, "scheduled", attempt)
-			if runErr != nil {
-				// Setup error (working dir missing, etc.) — non-retryable
-				d.logger.Printf("Job %q setup error: %v", j.Name, runErr)
-				slogger.Error("job setup error", "name", j.Name, "err", runErr)
-				if bot := d.tgBot.Load(); bot != nil {
-					bot.NotifyJobComplete(ctx, j.Name, "failed", fmt.Sprintf("infrastructure error: %s", runErr.Error()))
-				}
-				return
-			}
-
-			if result.Status == "success" {
-				break
-			}
-
-			if attempt < maxAttempts-1 {
-				slogger.Warn("job failed, will retry", "name", j.Name,
-					"attempt", attempt+1, "maxAttempts", maxAttempts, "status", result.Status)
-			}
+			return
+		}
+		if result == nil {
+			return // context cancelled
 		}
 
 		d.logger.Printf("Job %q finished: status=%s duration=%s", j.Name, result.Status, result.Duration)
@@ -283,6 +257,50 @@ func (d *Daemon) registerJobLocked(job *config.JobConfig) error {
 	d.logger.Printf("Registered job %q (%s)", j.Name, j.Schedule)
 	slogger.Info("registered job", "name", j.Name, "schedule", j.Schedule)
 	return nil
+}
+
+// runJobWithRetry executes a job using its configured retry policy.
+// Returns the final Result after all attempts, or nil if ctx was cancelled.
+// A non-nil error indicates a non-retryable setup failure (working dir missing, etc.).
+func (d *Daemon) runJobWithRetry(ctx context.Context, job *config.JobConfig, triggerType string) (*executor.Result, error) {
+	maxAttempts := 1 + job.MaxRetries
+	if maxAttempts <= 0 {
+		return nil, fmt.Errorf("job %q: invalid MaxRetries %d", job.Name, job.MaxRetries)
+	}
+	var result *executor.Result
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			delay := retryDelay(job.RetryBackoff, attempt-1)
+			d.logger.Printf("Job %q retry %d/%d in %s", job.Name, attempt, job.MaxRetries, delay)
+			slogger.Info("job retry scheduled", "name", job.Name, "retry", attempt, "maxRetries", job.MaxRetries, "delay", delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return nil, nil
+			}
+		}
+
+		var runErr error
+		result, runErr = executor.Run(ctx, d.db, job, triggerType, attempt)
+		if runErr != nil {
+			// Setup error — non-retryable
+			d.logger.Printf("Job %q setup error: %v", job.Name, runErr)
+			slogger.Error("job setup error", "name", job.Name, "err", runErr)
+			return nil, runErr
+		}
+
+		if result.Status == "success" {
+			break
+		}
+
+		if attempt < maxAttempts-1 {
+			slogger.Warn("job failed, will retry", "name", job.Name,
+				"attempt", attempt+1, "maxAttempts", maxAttempts, "status", result.Status)
+		}
+	}
+
+	return result, nil
 }
 
 // runChainedJobs launches each job listed in parent.OnSuccess in its own goroutine.
@@ -324,17 +342,27 @@ func (d *Daemon) runChainedJobs(parent *config.JobConfig, visited map[string]boo
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			result, err := executor.Run(ctx, d.db, child, "on_success", 0)
-			if err != nil {
-				d.logger.Printf("Chained job %q execution error: %v", childName, err)
-				slogger.Error("chained job execution error", "child", childName, "err", err)
+			result, runErr := d.runJobWithRetry(ctx, child, executor.TriggerOnSuccess)
+			if runErr != nil {
+				d.logger.Printf("Chained job %q setup error: %v", childName, runErr)
+				slogger.Error("chained job setup error", "child", childName, "err", runErr)
 				return
 			}
+			if result == nil {
+				return // context cancelled
+			}
+
 			d.logger.Printf("Chained job %q finished: status=%s duration=%s", childName, result.Status, result.Duration)
 			slogger.Info("chained job completed", "child", childName, "status", result.Status, "duration", result.Duration)
 
-			if bot := d.tgBot.Load(); bot != nil {
-				bot.NotifyJobComplete(ctx, childName, result.Status, result.Output)
+			if result.Status != "success" {
+				if bot := d.tgBot.Load(); bot != nil {
+					output := result.Output
+					if output == "" && result.Status == "failed" {
+						output = result.ErrorMsg
+					}
+					bot.NotifyJobComplete(ctx, childName, result.Status, output)
+				}
 			}
 
 			if result.Status == "success" && len(child.OnSuccess) > 0 {
@@ -389,8 +417,12 @@ func (d *Daemon) Reload() {
 func retryDelay(backoff string, retryIndex int) time.Duration {
 	const base = 30 * time.Second
 	const maxDelay = 5 * time.Minute
-	if backoff == "linear" {
-		return base * time.Duration(retryIndex+1)
+	if backoff == config.BackoffLinear {
+		d := base * time.Duration(retryIndex+1)
+		if d > maxDelay {
+			return maxDelay
+		}
+		return d
 	}
 	// exponential (default): cap the shift index to avoid integer overflow.
 	// 2^4 * 30s = 480s already exceeds maxDelay, so no need to compute further.
