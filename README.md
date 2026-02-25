@@ -65,36 +65,6 @@ This project just released and does not yet cover all security aspects. Contribu
 
 ---
 
-<h2><img src="public/logo.png" alt="" width="128" height="128" align="absmiddle"> Why OpenCrons 💡<h2>
-
-### The OAuth lockdown changed the game
-
-In January 2026, [Anthropic deployed server-side restrictions](https://winbuzzer.com/2026/02/19/anthropic-bans-claude-subscription-oauth-in-third-party-apps-xcxwbn/) that blocked third-party tools from authenticating with Claude Pro and Max subscription OAuth tokens. Tools like OpenCode, OpenClaw, and other Third-party [stopped working overnight](https://venturebeat.com/technology/anthropic-cracks-down-on-unauthorized-claude-usage-by-third-party-harnesses). The official policy is clear:
-
-> *OAuth authentication (used with Free, Pro, and Max plans) is intended **exclusively** for Claude Code and Claude.ai. Using OAuth tokens in any other product, tool, or service is not permitted.*
-> — [Claude Code Docs — Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)
-
-But here's the thing — **`claude -p` is Claude Code**. It's Anthropic's own CLI, running with your own subscription, exactly as intended. No OAuth hijacking, no third-party token routing, no terms of service violations. Just Claude Code doing what Claude Code was built to do.
-
-OpenCrons wraps `claude -p` in a structured scheduler. Every job is a direct invocation of Claude Code — the same binary, the same auth, the same process you'd run by hand in your terminal. Nothing in between.
-
-### OpenClaw is great, but cron deserves better
-
-[OpenClaw](https://openclaw.ai/) is a fantastic personal AI assistant — WhatsApp, Telegram, iMessage, 500+ integrations. But for many developers, [80–90% of what they actually use it for is cron jobs](https://docs.openclaw.ai/automation/cron-jobs): daily code reviews, morning briefings, CI monitoring, scheduled cleanups.
-
-OpenCrons takes that core use case and gives it the dedicated tooling it deserves:
-
-| | OpenClaw | OpenCrons |
-|---|---|---|
-| 🎯 **Focus** | General-purpose AI assistant | Purpose-built cron scheduler |
-| 👁️ **Visibility** | Jobs buried in a JSON file | Interactive TUI + structured logs |
-| 📊 **Tracking** | Minimal job history | SQLite with cost, tokens, status per run |
-| 🔐 **Auth** | Uses Claude Code OAuth | Uses Claude Code directly — fully compliant |
-
-If you need a Swiss Army knife, use OpenClaw. If you need your cron jobs to **just work** — with clear visibility, cost tracking, and a beautiful interface — that's OpenCrons.
-
----
-
 ## 📦 Install
 
 Requires [Go 1.25+](https://go.dev/dl/) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
