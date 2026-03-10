@@ -364,9 +364,7 @@ OpenCrons is focused on Claude Code today, but the vision is broader.
 - 🏷️ Job tags and filtering
 - 📱 Push notifications (beyond Telegram)
 - 🔀 **Multi-provider jobs** — run the same prompt against Claude and GPT in parallel, compare results
-- 🧠 **Agent task memory** — persistent per-job memory that survives between runs; agents accumulate context across executions rather than starting cold each time
 - 🔄 **Workflow agent pipeline** — chain multiple agents into a directed pipeline where each agent's output becomes the next one's input; branch on conditions, fan out in parallel, merge results
-- 📦 **Sandbox environment** — ✅ basic container support (Docker/Podman) shipped; planned: network isolation, resource limits, filesystem restrictions
 
 Have an idea? [Open an issue](https://github.com/DikaVer/opencrons/issues) — contributions are welcome.
 
