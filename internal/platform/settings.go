@@ -80,7 +80,7 @@ func SaveSettings(s Settings) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(settingsFile(), data, 0644); err != nil {
+	if err := os.WriteFile(settingsFile(), data, 0600); err != nil {
 		return err
 	}
 

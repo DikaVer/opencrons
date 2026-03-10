@@ -165,6 +165,33 @@ func buildToolsStep(allowedTools *[]string, options []huh.Option[string]) *huh.G
 	)
 }
 
+// buildContainerStep builds the container runtime selection step.
+func buildContainerStep(container, containerImage *string) *huh.Group {
+	return huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("📦 Container Runtime").
+			Description("Run the job inside a container for isolation. Requires the runtime to be installed.\n"+
+				"The working directory is bind-mounted into the container automatically.").
+			Options(
+				huh.NewOption("🖥️  None — run directly on host (default)", ""),
+				huh.NewOption("🐳 Docker — run inside a Docker container", "docker"),
+				huh.NewOption("🦭 Podman — run inside a Podman container (rootless)", "podman"),
+			).
+			Value(container),
+		huh.NewInput().
+			Title("🖼️  Container Image").
+			Description("Docker/Podman image to use. Must have claude CLI installed.\nRequired when a container runtime is selected above. Ignored when 'None' is selected.").
+			Placeholder("claude-runner:latest").
+			Value(containerImage).
+			Validate(func(s string) error {
+				if *container != "" && strings.TrimSpace(s) == "" {
+					return fmt.Errorf("container image is required when a container runtime is selected")
+				}
+				return nil
+			}),
+	)
+}
+
 // buildTimeoutRetryStep builds the timeout, summary, and retry configuration step.
 func buildTimeoutRetryStep(timeout, maxRetries, retryBackoff *string, summaryEnabled *bool) *huh.Group {
 	return huh.NewGroup(
@@ -227,6 +254,8 @@ func RunAddWizard() (*WizardResult, error) {
 		prompt         string
 		model          string
 		effort         string
+		container      string
+		containerImage string
 		timeout        string
 		summaryEnabled bool
 		maxRetries     string
@@ -263,6 +292,7 @@ func RunAddWizard() (*WizardResult, error) {
 		buildPromptStep(&prompt),
 		buildModelEffortStep(&model, &effort),
 		buildToolsStep(&allowedTools, toolOptions),
+		buildContainerStep(&container, &containerImage),
 		buildTimeoutRetryStep(&timeout, &maxRetries, &retryBackoff, &summaryEnabled),
 	}
 	if len(onSuccessOptions) > 0 {
@@ -306,6 +336,8 @@ func RunAddWizard() (*WizardResult, error) {
 		Model:            model,
 		Timeout:          parseInt(timeout, 300),
 		Effort:           effortVal,
+		Container:        container,
+		ContainerImage:   containerImage,
 		DisallowedTools:  nilIfEmpty(computeDisallowedTools(allowedTools)),
 		SummaryEnabled:   summaryEnabled,
 		MaxRetries:       parseInt(maxRetries, 0),
@@ -394,6 +426,10 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		onSuccessOptions = append(onSuccessOptions, opt)
 	}
 
+	// Container settings
+	container := job.Container
+	containerImage := job.ContainerImage
+
 	// keepChain is only consulted when all chain targets are unavailable.
 	keepChain := true
 	editGroups := []*huh.Group{
@@ -401,6 +437,7 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 		buildPromptStep(&prompt),
 		buildModelEffortStep(&model, &effort),
 		buildToolsStep(&allowedTools, toolOptions),
+		buildContainerStep(&container, &containerImage),
 		buildTimeoutRetryStep(&timeout, &maxRetries, &retryBackoff, &summaryEnabled),
 	}
 	if len(onSuccessOptions) > 0 {
@@ -465,6 +502,8 @@ func RunEditWizard(job *config.JobConfig, existingPrompt string) (*WizardResult,
 	job.Model = model
 	job.Effort = effortVal
 	job.Timeout = parseInt(timeout, 300)
+	job.Container = container
+	job.ContainerImage = containerImage
 	job.DisallowedTools = nilIfEmpty(disallowed)
 	job.SummaryEnabled = summaryEnabled
 	job.MaxRetries = parseInt(maxRetries, 0)

@@ -21,7 +21,8 @@ var startCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(startCmd)
-	startCmd.Flags().Bool("install", false, "install as system service")
+	startCmd.Flags().Bool("install", false, "install as a service (user service by default, no sudo needed)")
+	startCmd.Flags().Bool("system", false, "install as system-wide service (requires sudo, use with --install)")
 	startCmd.Flags().Bool("foreground", false, "run in foreground (blocks until stopped)")
 }
 
@@ -32,6 +33,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	install, _ := cmd.Flags().GetBool("install")
 	if install {
+		system, _ := cmd.Flags().GetBool("system")
+		if system {
+			return daemon.InstallSystemService()
+		}
 		return daemon.InstallService()
 	}
 

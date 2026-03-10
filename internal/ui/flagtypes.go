@@ -26,6 +26,12 @@ var ValidEfforts = map[string]bool{
 	"low": true, "medium": true, "high": true, "max": true,
 }
 
+// ValidContainers is the canonical set of accepted container runtimes.
+// Treat as read-only; do not add or remove entries at runtime.
+var ValidContainers = map[string]bool{
+	"docker": true, "podman": true,
+}
+
 // sortedKeys returns the sorted keys of a map for deterministic error messages.
 func sortedKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))
@@ -157,6 +163,25 @@ func (v *DirValue) Set(s string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("path %q is not a directory", s)
+	}
+	v.val = s
+	return nil
+}
+
+// --- ContainerValue ---
+
+// ContainerValue validates that the flag value is a recognized container runtime.
+type ContainerValue struct {
+	val string
+}
+
+func NewContainerValue(def string) *ContainerValue { return &ContainerValue{val: def} }
+func (v *ContainerValue) String() string           { return v.val }
+func (v *ContainerValue) Type() string             { return "container" }
+
+func (v *ContainerValue) Set(s string) error {
+	if !ValidContainers[s] {
+		return fmt.Errorf("invalid container %q (valid: %s)", s, strings.Join(sortedKeys(ValidContainers), ", "))
 	}
 	v.val = s
 	return nil

@@ -29,6 +29,7 @@ var (
 	flagModel      = ui.NewModelValue("sonnet")
 	flagEffort     = ui.NewEffortValue("")
 	flagTimeout    = ui.NewTimeoutValue(300)
+	flagContainer  = ui.NewContainerValue("")
 )
 
 var addCmd = &cobra.Command{
@@ -55,6 +56,8 @@ func init() {
 	addCmd.Flags().Int("max-retries", 0, "number of retries on failure (0-10)")
 	addCmd.Flags().String("retry-backoff", "exponential", "retry delay strategy: exponential (default) or linear")
 	addCmd.Flags().StringArray("on-success", nil, "jobs to trigger on success (repeatable, e.g. --on-success job-b --on-success job-c)")
+	addCmd.Flags().Var(flagContainer, "container", "container runtime: docker, podman")
+	addCmd.Flags().String("container-image", "", "container image (required when --container is set)")
 
 	// Shell completion for enum flags
 	modelKeys := make([]string, 0, len(ui.ValidModels))
@@ -73,6 +76,15 @@ func init() {
 	sort.Strings(effortKeys)
 	_ = addCmd.RegisterFlagCompletionFunc("effort", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return effortKeys, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	containerKeys := make([]string, 0, len(ui.ValidContainers))
+	for k := range ui.ValidContainers {
+		containerKeys = append(containerKeys, k)
+	}
+	sort.Strings(containerKeys)
+	_ = addCmd.RegisterFlagCompletionFunc("container", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return containerKeys, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	_ = addCmd.RegisterFlagCompletionFunc("working-dir", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -141,6 +153,13 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		retryBackoff = config.BackoffExponential
 	}
 	onSuccess, _ := cmd.Flags().GetStringArray("on-success")
+	container := flagContainer.String()
+	containerImage, _ := cmd.Flags().GetString("container-image")
+
+	// Validate container image requirement
+	if container != "" && strings.TrimSpace(containerImage) == "" {
+		return fmt.Errorf("--container-image is required when --container is set")
+	}
 
 	// Validate required flags
 	var missing []string
@@ -185,6 +204,8 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		Model:            model,
 		Effort:           effort,
 		Timeout:          timeout,
+		Container:        container,
+		ContainerImage:   containerImage,
 		DisallowedTools:  disallowedTools,
 		SummaryEnabled:   summaryEnabled,
 		MaxRetries:       maxRetries,
@@ -222,6 +243,9 @@ func runAddNonInteractive(cmd *cobra.Command) error {
 		fmt.Printf("  Effort:   %s\n", effort)
 	}
 	fmt.Printf("  Timeout:  %ds\n", timeout)
+	if container != "" {
+		fmt.Printf("  Container: %s (%s)\n", container, containerImage)
+	}
 	if len(disallowedTools) > 0 {
 		fmt.Printf("  Denied:   %s\n", strings.Join(disallowedTools, ", "))
 	}

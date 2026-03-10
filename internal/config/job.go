@@ -31,6 +31,8 @@ type JobConfig struct {
 	Model            string `yaml:"model,omitempty"`
 	Timeout          int    `yaml:"timeout,omitempty"`
 	Effort           string   `yaml:"effort,omitempty"`
+	Container        string   `yaml:"container,omitempty"`        // "" (host), "docker", or "podman"
+	ContainerImage   string   `yaml:"container_image,omitempty"`  // image to use when container is set
 	DisallowedTools  []string `yaml:"disallowed_tools,omitempty"`
 	SummaryEnabled   bool     `yaml:"summary_enabled,omitempty"`
 	NoSessionPersist bool     `yaml:"no_session_persistence,omitempty"`
@@ -86,6 +88,18 @@ func (j *JobConfig) Validate() error {
 		if !ui.ValidEfforts[j.Effort] {
 			return fmt.Errorf("job %q: unknown effort %q (valid: low, medium, high, max)", j.Name, j.Effort)
 		}
+	}
+
+	// Validate container runtime
+	if j.Container != "" {
+		if !ui.ValidContainers[j.Container] {
+			return fmt.Errorf("job %q: unknown container %q (valid: docker, podman)", j.Name, j.Container)
+		}
+	}
+
+	// Validate container image requires container runtime
+	if j.ContainerImage != "" && j.Container == "" {
+		return fmt.Errorf("job %q: container_image requires container to be set (docker or podman)", j.Name)
 	}
 
 	// Validate timeout

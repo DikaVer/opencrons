@@ -89,11 +89,39 @@ func BuildCommand(ctx context.Context, job *config.JobConfig, workingDir string)
 
 	// Pass prompt via stdin to avoid exposing it in process list
 	// and to avoid OS argument length limits
-	cmd := exec.CommandContext(ctx, "claude", args...)
-	cmd.Stdin = strings.NewReader(prompt)
-	cmd.Dir = workingDir
+	var cmd *exec.Cmd
+	if job.Container != "" {
+		// Wrap in container: bind-mount working dir, mount Claude config for
+		// OAuth credentials, and pass ANTHROPIC_API_KEY for key-based auth.
+		runtime := job.Container // "docker" or "podman"
+		homeDir, _ := os.UserHomeDir()
+		claudeConfigDir := filepath.Join(homeDir, ".claude")
 
-	log.Debug("built command", "args", strings.Join(args, " "), "dir", workingDir)
+		claudeAuthFile := filepath.Join(homeDir, ".claude.json")
+
+		containerArgs := []string{
+			"run", "--rm", "-i",
+			"--userns=keep-id",
+			"-v", workingDir + ":/workspace",
+			"-w", "/workspace",
+			"-v", claudeConfigDir + ":/home/node/.claude:ro",
+			"-v", claudeAuthFile + ":/home/node/.claude.json:ro",
+			"-e", "ANTHROPIC_API_KEY",
+		}
+		containerArgs = append(containerArgs, job.ContainerImage)
+		containerArgs = append(containerArgs, args...)
+		cmd = exec.CommandContext(ctx, runtime, containerArgs...)
+		cmd.Stdin = strings.NewReader(prompt)
+		// Dir is irrelevant for container execution, but set it for log consistency
+		cmd.Dir = workingDir
+		log.Debug("built container command", "runtime", runtime, "image", job.ContainerImage,
+			"args", strings.Join(args, " "), "dir", workingDir)
+	} else {
+		cmd = exec.CommandContext(ctx, "claude", args...)
+		cmd.Stdin = strings.NewReader(prompt)
+		cmd.Dir = workingDir
+		log.Debug("built command", "args", strings.Join(args, " "), "dir", workingDir)
+	}
 
 	return &BuildResult{Cmd: cmd}, nil
 }

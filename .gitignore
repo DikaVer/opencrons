@@ -1,5 +1,6 @@
 # Build artifacts
 /build/
+/opencrons
 *.exe
 
 # Runtime data (created by opencrons at ~/.opencrons or %APPDATA%\opencrons)
