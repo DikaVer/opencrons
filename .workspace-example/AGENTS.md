@@ -98,7 +98,8 @@ The daemon is the cron scheduler that actually runs jobs on schedule. It also ru
 
 ```bash
 OpenCrons start              # start daemon in foreground (Ctrl+C to stop)
-OpenCrons start --install    # install as OS service (requires admin/root)
+OpenCrons start --install    # install as user service (no sudo needed)
+OpenCrons start --install --system  # install as system service (requires sudo)
 OpenCrons stop               # stop running daemon (graceful shutdown, 10s timeout)
 OpenCrons status             # show daemon status (running/stopped, PID, next scheduled runs)
 ```
@@ -124,7 +125,9 @@ OpenCrons add --non-interactive \
   --effort medium \
   --timeout 300 \
   --summary \
-  --disallowed-tools "Bash(git:*)"
+  --disallowed-tools "Bash(git:*)" \
+  --container podman \                    # optional: docker|podman
+  --container-image claude-runner:latest \ # optional, required with --container
 ```
 
 | Flag | Required | Default | Description |
@@ -140,6 +143,8 @@ OpenCrons add --non-interactive \
 | `--timeout` | No | `300` | Wall-clock timeout in seconds |
 | `--summary` | No | `false` | Enable execution summary |
 | `--disallowed-tools` | No | — | Tools to deny (repeatable flag) |
+| `--container` | No | — | Container runtime: `docker` or `podman` |
+| `--container-image` | No | — | Container image (required with --container) |
 
 **Prompt file location:**
 - Linux/macOS: `~/.OpenCrons/prompts/<name>.md`
@@ -220,6 +225,7 @@ When the daemon triggers a job (or `OpenCrons run` is used):
 1. `executor.Run()` → `context.WithTimeout` (job's timeout setting)
 2. `BuildCommand()` reads the prompt file, prepends embedded `task-preamble.txt`, optionally appends `summary-prompt.txt`
 3. Full prompt is piped via **stdin** to `claude -p` (not CLI args — avoids OS length limits)
+3a. If `container` is configured, wraps the command in `docker/podman run` with bind-mounted workdir, Claude config (`~/.claude`, `~/.claude.json`), and `--userns=keep-id`
 4. Hardcoded flags: `--permission-mode bypassPermissions --output-format json`
 5. Optional flags: `--model`, `--effort`, `--no-session-persistence`, `--disallowed-tools`
 6. stdout/stderr captured to log files in `logs/`

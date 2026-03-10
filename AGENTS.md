@@ -50,6 +50,8 @@ opencrons add --non-interactive \
   --working-dir "/path/to/project" \
   --prompt-file "job-name.md" \          # optional, defaults to <name>.md
   --prompt-content "Do something..." \   # optional, writes to prompt file
+  --container podman \                    # optional: docker|podman
+  --container-image claude-runner:latest \ # optional, required with --container
   --model sonnet \                       # optional: sonnet|opus|haiku
   --effort medium \                      # optional: low|medium|high|max
   --timeout 300 \                        # optional, seconds (default 300)
@@ -60,7 +62,8 @@ opencrons add --non-interactive \
 opencrons logs [name] -n 50              # --limit/-n: number of entries (default 20)
 opencrons remove <name> -f               # --force/-f: skip confirmation
 opencrons remove <name> --keep-prompt    # delete config only, keep prompt file
-opencrons start --install                # install as OS service
+opencrons start --install                # install as user service (no sudo)
+opencrons start --install --system       # install as system service (requires sudo)
 ```
 
 ## Architecture
@@ -98,7 +101,7 @@ Shared logic lives in the `cmd` package as unexported functions so both modes re
 
 **Job creation:** `cmd/add.go` → TUI wizard or CLI flags → writes `prompts/<name>.md` + `schedules/<name>.yml`. Duplicate names validated in both paths.
 
-**Job execution:** `executor.Run()` → timeout via `context.WithTimeout` → `BuildCommand(ctx)` reads prompt → prepends embedded `task-preamble.txt` → appends optional `summary-prompt.txt` injection → pipes prompt via stdin to `claude -p [flags]` → passes `--effort`, `--permission-mode bypassPermissions`, `--output-format json` → captures stdout/stderr to log files → parses JSON for cost/usage → writes to SQLite.
+**Job execution:** `executor.Run()` → timeout via `context.WithTimeout` → `BuildCommand(ctx)` reads prompt → prepends embedded `task-preamble.txt` → appends optional `summary-prompt.txt` injection → pipes prompt via stdin to `claude -p [flags]` → passes `--effort`, `--permission-mode bypassPermissions`, `--output-format json` → captures stdout/stderr to log files → parses JSON for cost/usage → writes to SQLite. When `container` is configured, the command is wrapped in `docker run` or `podman run` with bind-mounted workdir, Claude config, and `--userns=keep-id`.
 
 **Daemon:** `daemon.Run()` → PID file → SQLite → loads configs → cron entries (`SkipIfStillRunning`) → starts Telegram bot (if configured) → fsnotify watcher → blocks on SIGINT/SIGTERM → stops bot → stops cron → graceful shutdown.
 
@@ -126,7 +129,7 @@ Settings {
 
 ### JobConfig fields (config/job.go)
 
-`ID`, `Name`, `Schedule`, `WorkingDir`, `PromptFile`, `Model`, `Timeout`, `Effort`, `DisallowedTools`, `SummaryEnabled`, `NoSessionPersist`, `Enabled`
+`ID`, `Name`, `Schedule`, `WorkingDir`, `PromptFile`, `Model`, `Timeout`, `Effort`, `DisallowedTools`, `SummaryEnabled`, `NoSessionPersist`, `Enabled`, `Container`, `ContainerImage`
 
 ### Hardcoded execution defaults
 
@@ -139,6 +142,7 @@ Settings {
 | `effort` | (empty = high) | Claude Code default |
 | `disallowed_tools` | (empty) | Optional tool restriction list |
 | `summary_enabled` | `false` | Optional summary injection |
+| `container` | (empty) | Optional: `docker` or `podman` |
 
 ### Platform support
 

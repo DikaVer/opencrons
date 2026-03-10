@@ -60,6 +60,7 @@ This is intentional for automation — but it means **the prompt is the security
 - Set a `working_dir` that contains only what the job needs access to
 - Review execution logs regularly (`opencrons logs`)
 - Keep your Claude Code version up to date
+- Use `container: podman` or `container: docker` to run jobs inside an isolated container — the working directory is bind-mounted and credentials are passed read-only
 
 This project just released and does not yet cover all security aspects. Contributions and issues are welcome.
 
@@ -166,7 +167,9 @@ opencrons add --non-interactive \
   --schedule "0 9 * * *" \
   --working-dir "/path/to/project" \
   --prompt-content "Review open PRs and summarize findings." \
-  --model sonnet
+  --model sonnet \
+  --container podman \
+  --container-image claude-runner:latest
 ```
 
 ### 3. Start the daemon
@@ -239,7 +242,8 @@ opencrons logs [name]      # view execution logs (-n to set limit)
 
 ```bash
 opencrons start            # start the daemon (foreground)
-opencrons start --install  # install as OS service
+opencrons start --install  # install as user service (no sudo needed)
+opencrons start --install --system  # install as system service (requires sudo)
 opencrons stop             # stop the daemon
 opencrons status           # check daemon status
 ```
@@ -278,6 +282,11 @@ Each job is a YAML file in `schedules/` with a corresponding prompt in `prompts/
 | `timeout` | Seconds before killing the job | `300` |
 | `disallowed_tools` | Tool restrictions (e.g. `Bash(git:*)`) | none |
 | `summary_enabled` | Generate execution summary | `false` |
+| `container` | Container runtime: `docker` or `podman` | none (host) |
+| `container_image` | Container image (required when container is set) | none |
+| `max_retries` | Retries on failure (0-10) | `0` |
+| `retry_backoff` | Retry strategy: `exponential` or `linear` | `exponential` |
+| `on_success` | Jobs to chain on success | none |
 | `enabled` | Whether the job runs on schedule | `true` |
 
 ### 📂 Directory structure
@@ -333,7 +342,7 @@ When a job triggers, OpenCrons:
 1. 📄 Reads the prompt file and prepends a [task preamble](internal/executor/task-preamble.txt)
 2. 📎 Optionally appends a [summary prompt](internal/executor/summary-prompt.txt)
 3. 🔒 Pipes everything via stdin to `claude -p` (avoids argument length limits)
-4. 🚀 Passes `--effort`, `--model`, `--permission-mode bypassPermissions`, `--output-format json`
+4. 🚀 Passes `--effort`, `--model`, `--permission-mode bypassPermissions`, `--output-format json`; optionally wraps in Docker/Podman container
 5. 📝 Captures stdout/stderr to log files
 6. 📊 Parses the JSON response for cost, token usage, and result
 7. 💾 Writes execution records to SQLite
@@ -357,7 +366,7 @@ OpenCrons is focused on Claude Code today, but the vision is broader.
 - 🔀 **Multi-provider jobs** — run the same prompt against Claude and GPT in parallel, compare results
 - 🧠 **Agent task memory** — persistent per-job memory that survives between runs; agents accumulate context across executions rather than starting cold each time
 - 🔄 **Workflow agent pipeline** — chain multiple agents into a directed pipeline where each agent's output becomes the next one's input; branch on conditions, fan out in parallel, merge results
-- 📦 **Sandbox environment** — run agents inside an isolated container or VM with restricted filesystem and network access, so `bypassPermissions` is safer by construction
+- 📦 **Sandbox environment** — ✅ basic container support (Docker/Podman) shipped; planned: network isolation, resource limits, filesystem restrictions
 
 Have an idea? [Open an issue](https://github.com/DikaVer/opencrons/issues) — contributions are welcome.
 
